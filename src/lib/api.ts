@@ -80,3 +80,38 @@ export async function submitIntervention(
     })
     return res.json()
 }
+
+export async function updateSessionStatus(sessionId: string, status: string) {
+    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/status?status=${status}`, {
+        method: "PATCH",
+        headers: authHeaders(),
+    })
+    return res.json()
+}
+
+export async function uploadDataset(sessionId: string, files: FileList) {
+    const formData = new FormData()
+    Array.from(files).forEach(file => formData.append("files", file))
+    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/upload`, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${getToken()}`,
+        },
+        body: formData,
+    })
+    return res.json()
+}
+
+export async function downloadModel(sessionId: string) {
+    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/model/download`, {
+        headers: authHeaders(),
+    })
+    if (!res.ok) throw new Error("Model not ready")
+    const blob = await res.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `pentagon_model_${sessionId}.pt`
+    a.click()
+    window.URL.revokeObjectURL(url)
+}
