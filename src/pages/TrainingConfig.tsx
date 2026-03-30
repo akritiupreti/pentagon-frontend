@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
+import { createSession, uploadDataset, suggestHyperparameters } from "../lib/api"
+import { toast, ToastContainer } from "react-toastify"
+import "react-toastify/dist/ReactToastify.css"
 
 export default function TrainingConfig() {
     const navigate = useNavigate()
@@ -14,16 +17,115 @@ export default function TrainingConfig() {
     const [status, setStatus] = useState("Training Not Started Yet!")
     const [isTraining, setIsTraining] = useState(false)
     const [isPaused, setIsPaused] = useState(false)
+    const [isLoadingParams, setIsLoadingParams] = useState(true)
 
     useEffect(() => {
         const token = localStorage.getItem("token")
         if (!token) navigate("/login")
+        else {
+            // Get hyperparameter suggestions from Claude
+            getSuggestedHyperparameters()
+        }
     }, [navigate])
+
+    async function getSuggestedHyperparameters() {
+        try {
+            setIsLoadingParams(true)
+            
+            // Get image count from localStorage
+            const imageCountStr = localStorage.getItem("imageCount")
+            const imageCount = imageCountStr ? parseInt(imageCountStr, 10) : 0
+
+            // Parse classes from search params
+            const classList = classes ? classes.split(",").filter((c) => c.trim()) : []
+
+            if (imageCount > 0 && classList.length > 0) {
+                // Call Claude to suggest hyperparameters
+                const suggestions = await suggestHyperparameters(imageCount, classList)
+                
+                // Set suggested values
+                setAcceptanceCriteria(suggestions.acceptance_criteria || "80%")
+                setEpochs(suggestions.epochs || "10")
+                setLearningRate(suggestions.learning_rate || "1e-4")
+                
+                // Show appropriate toast based on whether Claude succeeded
+                if (suggestions.from_claude) {
+                    toast.success("Hyperparameters optimized by Claude!", {
+                        position: "top-right",
+                        autoClose: 3000,
+                        hideProgressBar: false,
+                        closeOnClick: true,
+                        pauseOnHover: true,
+                        draggable: true,
+                    })
+                } else {
+                    toast.info("Using default hyperparameters. Configure AWS credentials for Claude optimization.", {
+                        position: "top-right",
+                        autoClose: 4000,
+                        hideProgressBar: false,
+                        closeOnClick: true,
+                        pauseOnHover: true,
+                        draggable: true,
+                    })
+                }
+            }
+        } catch (error) {
+            console.error("Error getting hyperparameter suggestions:", error)
+            toast.error("Failed to fetch parameters. Using defaults.", {
+                position: "top-right",
+                autoClose: 3000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+            })
+            // Keep default values if Claude call fails
+        } finally {
+            setIsLoadingParams(false)
+        }
+    }
 
     function handleStart() {
         setIsTraining(true)
         setIsPaused(false)
-        setStatus("Training in progress...")
+        setStatus("Creating session...")
+        createSessionAndStartTraining()
+    }
+
+    async function createSessionAndStartTraining() {
+        try {
+            // Map type to task (medical or realtime)
+            const task = type === "medical" ? "medical" : "realtime"
+            // Default to deeplabv3+ architecture
+            const architecture = "deeplabv3+"
+            
+            // Create session
+            const sessionRes = await createSession(name, architecture, task)
+            if (!sessionRes.id) {
+                setStatus("Failed to create session")
+                setIsTraining(false)
+                return
+            }
+
+            // Get image count from localStorage
+            const imageCountStr = localStorage.getItem("imageCount")
+            const imageCount = imageCountStr ? parseInt(imageCountStr, 10) : 0
+
+            // Upload dataset info (just the count)
+            if (imageCount > 0) {
+                await uploadDataset(sessionRes.id, imageCount)
+            }
+
+            // Clear the stored image count
+            localStorage.removeItem("imageCount")
+
+            // Navigate to session detail page
+            navigate(`/dashboard/session/${sessionRes.id}`)
+        } catch (error) {
+            console.error("Error starting training:", error)
+            setStatus("Error creating session")
+            setIsTraining(false)
+        }
     }
 
     function handlePause() {
@@ -69,7 +171,65 @@ export default function TrainingConfig() {
         fontSize: "1rem",
     }
 
+    if (isLoadingParams) {
+        return (
+            <main style={{ background: "var(--bg)", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+                <header
+                    style={{
+                        background: "var(--header)",
+                        padding: "16px 40px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                    }}
+                >
+                    <span
+                        style={{
+                            color: "var(--accent)",
+                            fontWeight: 800,
+                            letterSpacing: "0.05em",
+                            fontSize: "1.2rem",
+                        }}
+                    >
+                        Training
+                    </span>
+                </header>
+                <div
+                    style={{
+                        flex: 1,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "24px",
+                    }}
+                >
+                    <div
+                        style={{
+                            width: "48px",
+                            height: "48px",
+                            border: "4px solid var(--accent)",
+                            borderTop: "4px solid transparent",
+                            borderRadius: "50%",
+                            animation: "spin 1s linear infinite",
+                        }}
+                    />
+                    <p style={{ color: "var(--text-muted)", fontSize: "1rem", fontWeight: 500 }}>
+                        Optimizing hyperparameters with Claude...
+                    </p>
+                    <style>{`
+                        @keyframes spin {
+                            to { transform: rotate(360deg); }
+                        }
+                    `}</style>
+                </div>
+            </main>
+        )
+    }
+
     return (
+        <>
         <main
             style={{
                 background: "var(--bg)",
@@ -114,11 +274,6 @@ export default function TrainingConfig() {
                     <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
                         Model: <strong style={{ color: "var(--navy)" }}>{name}</strong> &mdash; <strong style={{ color: "var(--navy)" }}>{type === "medical" ? "Medical" : "Real Time"}</strong>
                     </p>
-                    {classes && (
-                        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                            Classes: <strong style={{ color: "var(--navy)" }}>{classes}</strong>
-                        </p>
-                    )}
                 </div>
 
                 <div
@@ -259,5 +414,17 @@ export default function TrainingConfig() {
                 </button>
             </div>
         </main>
+        <ToastContainer
+            position="top-right"
+            autoClose={5000}
+            hideProgressBar={false}
+            newestOnTop={false}
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+        />
+    </>
     )
 }

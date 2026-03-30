@@ -123,3 +123,16 @@ export async function downloadModel(sessionId: string) {
     a.click()
     window.URL.revokeObjectURL(url)
 }
+
+export async function suggestHyperparameters(imageCount: number, classes: string[]) {
+    const res = await fetch(`${BASE_URL}/sessions/suggest-hyperparameters`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+            image_count: imageCount,
+            image_size: 256,
+            classes: classes,
+        }),
+    })
+    return res.json()
+}
