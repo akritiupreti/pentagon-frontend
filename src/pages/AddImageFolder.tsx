@@ -7,6 +7,7 @@ export default function AddImageFolder() {
     const mode = searchParams.get("mode") || "train"
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [folderName, setFolderName] = useState<string | null>(null)
+    const [imageCount, setImageCount] = useState<number>(0)
 
     useEffect(() => {
         const token = localStorage.getItem("token")
@@ -19,6 +20,9 @@ export default function AddImageFolder() {
             const path = (files[0] as any).webkitRelativePath || ""
             const folder = path.split("/")[0]
             setFolderName(folder)
+            setImageCount(files.length)
+            // Store image count in localStorage for later use in TrainingConfig
+            localStorage.setItem("imageCount", files.length.toString())
         }
     }
 
@@ -162,9 +166,14 @@ export default function AddImageFolder() {
                 />
 
                 {folderName && (
-                    <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-                        Folder selected: <strong>{folderName}</strong>
-                    </p>
+                    <div style={{ textAlign: "center" }}>
+                        <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                            Folder selected: <strong>{folderName}</strong>
+                        </p>
+                        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginTop: "4px" }}>
+                            <strong>{imageCount}</strong> {imageCount === 1 ? "image" : "images"} found
+                        </p>
+                    </div>
                 )}
 
                 {/* Next Button */}
