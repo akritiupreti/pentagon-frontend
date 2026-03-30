@@ -68,8 +68,8 @@ export default function SessionDetail() {
         setGeneratingKey(true)
         try {
             const res = await generateApiKey(id)
-            if (res.key) {
-                setApiKey(res.key)
+            if (res.apiKey) {
+                setApiKey(res.apiKey)
                 setKeyVisible(true)
             }
         } catch {
