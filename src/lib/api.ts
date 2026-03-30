@@ -89,15 +89,23 @@ export async function updateSessionStatus(sessionId: string, status: string) {
     return res.json()
 }
 
-export async function uploadDataset(sessionId: string, files: FileList) {
-    const formData = new FormData()
-    Array.from(files).forEach(file => formData.append("files", file))
-    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/upload`, {
+// export async function uploadDataset(sessionId: string, files: FileList) {
+//     const formData = new FormData()
+//     Array.from(files).forEach(file => formData.append("files", file))
+//     const res = await fetch(`${BASE_URL}/sessions/${sessionId}/upload`, {
+//         method: "POST",
+//         headers: {
+//             Authorization: `Bearer ${getToken()}`,
+//         },
+//         body: formData,
+//     })
+//     return res.json()
+// }
+
+export async function uploadDataset(sessionId: string, imageCount: number) {
+    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/upload?image_count=${imageCount}`, {
         method: "POST",
-        headers: {
-            Authorization: `Bearer ${getToken()}`,
-        },
-        body: formData,
+        headers: authHeaders(),
     })
     return res.json()
 }
