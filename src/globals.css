@@ -1,33 +1,31 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 :root {
-    --bg: #f5fadf;
-    --navy: #1a2332;
-    --header: #2d3f50;
-    --accent: #7dc421;
-    --accent-dark: #5a9a18;
-    --card: #1a2332;
-    --text-muted: #4a5568;
+  --bg: #f5fadf;
+  --navy: #1a2332;
+  --header: #2d3f50;
+  --accent: #7dc421;
+  --accent-dark: #5a9a18;
+  --card: #1a2332;
+  --text-muted: #4a5568;
 }
 
 * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+  box-sizing: border-box;
+  /* margin: 0;
+  padding: 0; */
 }
 
 body {
-    background-color: var(--bg);
-    color: var(--navy);
-    font-family: 'Inter', sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg);
+  color: var(--navy);
+  font-family: "Inter", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 input,
 select,
 button {
-    font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
 }
