@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { createSession, uploadDataset, suggestHyperparameters } from "../lib/api"
 import { toast, ToastContainer } from "react-toastify"
 import "react-toastify/dist/ReactToastify.css"
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import Navbar from "../components/Navbar"
 import GlassDropdown from "../components/GlassDropdown"
+
+type MetricPoint = { step: number; trainLoss: number; valLoss: number; accuracy: number }
 
 export default function TrainingConfig() {
   const navigate = useNavigate()
@@ -12,27 +15,70 @@ export default function TrainingConfig() {
   const type = searchParams.get("type") || "medical"
   const name = searchParams.get("name") || ""
   const classes = searchParams.get("classes") || ""
+  const classList = classes ? classes.split(",").filter((c) => c.trim()) : []
 
   const [acceptanceCriteria, setAcceptanceCriteria] = useState("80%")
   const [epochs, setEpochs] = useState("10")
   const [learningRate, setLearningRate] = useState("1e-4")
-  const [status, setStatus] = useState("Training Not Started Yet!")
   const [isTraining, setIsTraining] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [isLoadingParams, setIsLoadingParams] = useState(true)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [progress, setProgress] = useState(0)
+  const [metrics, setMetrics] = useState<MetricPoint[]>([])
+  const initRan = useRef(false)
+  const progressRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const stepRef = useRef(0)
 
   useEffect(() => {
     const token = localStorage.getItem("token")
-    if (!token) navigate("/login")
-    else getSuggestedHyperparameters()
+    if (!token) { navigate("/login"); return }
+    if (initRan.current) return
+    initRan.current = true
+    init()
   }, [navigate])
 
-  async function getSuggestedHyperparameters() {
+  // Simulated progress + metrics
+  useEffect(() => {
+    if (isTraining && !isPaused) {
+      progressRef.current = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 100) {
+            clearInterval(progressRef.current!)
+            setIsTraining(false)
+            toast.success("Training complete!", { position: "top-right", autoClose: 3000 })
+            return 100
+          }
+          return prev + Math.random() * 1.5 + 0.3
+        })
+
+        stepRef.current += 1
+        const s = stepRef.current
+        const decay = Math.exp(-s * 0.04)
+        setMetrics((prev) => [...prev, {
+          step: s,
+          trainLoss: 2.5 * decay + Math.random() * 0.15,
+          valLoss: 2.8 * decay + Math.random() * 0.2 + 0.05,
+          accuracy: Math.min(0.98, (1 - decay) * 0.95 + Math.random() * 0.02),
+        }])
+      }, 500)
+    } else if (progressRef.current) {
+      clearInterval(progressRef.current)
+    }
+    return () => { if (progressRef.current) clearInterval(progressRef.current) }
+  }, [isTraining, isPaused])
+
+  async function init() {
+    setIsLoadingParams(true)
     try {
-      setIsLoadingParams(true)
+      if (classes) {
+        const task = type === "medical" ? "medical" : "realtime"
+        const sessionRes = await createSession(name, "deeplabv3+", task, classes)
+        if (sessionRes.id) setSessionId(sessionRes.id)
+      }
+
       const imageCountStr = localStorage.getItem("imageCount")
       const imageCount = imageCountStr ? parseInt(imageCountStr, 10) : 0
-      const classList = classes ? classes.split(",").filter((c) => c.trim()) : []
 
       if (imageCount > 0 && classList.length > 0) {
         const suggestions = await suggestHyperparameters(imageCount, classList)
@@ -47,8 +93,8 @@ export default function TrainingConfig() {
         }
       }
     } catch (error) {
-      console.error("Error getting hyperparameter suggestions:", error)
-      toast.error("Failed to fetch parameters. Using defaults.", { position: "top-right", autoClose: 3000 })
+      console.error("Error initializing:", error)
+      toast.error("Failed to initialize. Using defaults.", { position: "top-right", autoClose: 3000 })
     } finally {
       setIsLoadingParams(false)
     }
@@ -57,40 +103,17 @@ export default function TrainingConfig() {
   function handleStart() {
     setIsTraining(true)
     setIsPaused(false)
-    setStatus("Creating session...")
-    createSessionAndStartTraining()
+    setProgress(0)
+    setMetrics([])
+    stepRef.current = 0
   }
 
-  async function createSessionAndStartTraining() {
-    try {
-      const task = type === "medical" ? "medical" : "realtime"
-      const architecture = "deeplabv3+"
-      const sessionRes = await createSession(name, architecture, task)
-      if (!sessionRes.id) {
-        setStatus("Failed to create session")
-        setIsTraining(false)
-        return
-      }
-      const imageCountStr = localStorage.getItem("imageCount")
-      const imageCount = imageCountStr ? parseInt(imageCountStr, 10) : 0
-      if (imageCount > 0) await uploadDataset(sessionRes.id, imageCount)
-      localStorage.removeItem("imageCount")
-      navigate(`/dashboard/session/${sessionRes.id}`)
-    } catch (error) {
-      console.error("Error starting training:", error)
-      setStatus("Error creating session")
-      setIsTraining(false)
-    }
+  function handlePauseResume() {
+    setIsPaused((prev) => !prev)
   }
 
-  function handlePause() {
-    if (!isTraining) return
-    setIsPaused((prev) => {
-      const next = !prev
-      setStatus(next ? "Training Paused" : "Training in progress...")
-      return next
-    })
-  }
+  const locked = isTraining || progress >= 100
+  const latestMetric = metrics[metrics.length - 1]
 
   if (isLoadingParams) {
     return (
@@ -108,8 +131,8 @@ export default function TrainingConfig() {
     <>
       <div className="bg-surface-dim text-on-surface font-body min-h-screen flex flex-col">
         <Navbar />
-        <main className="flex-1 flex items-center justify-center pt-28 pb-12 px-6">
-          <div className="w-full max-w-2xl">
+        <main className="flex-1 pt-28 pb-12 px-6">
+          <div className="w-full max-w-5xl mx-auto">
             <div className="mb-10 flex flex-col gap-2 text-center">
               <h1 className="text-4xl font-extrabold font-headline tracking-tight text-on-surface">Hyperparameter Configuration</h1>
               <p className="text-on-surface-variant">
@@ -117,87 +140,235 @@ export default function TrainingConfig() {
               </p>
             </div>
 
-            {isTraining && (
-              <div className="mb-8 glass-panel p-4 rounded-full flex items-center justify-center gap-3">
-                <span className="relative flex h-3 w-3">
-                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isPaused ? "bg-secondary" : "bg-tertiary"} opacity-75`} />
-                  <span className={`relative inline-flex rounded-full h-3 w-3 ${isPaused ? "bg-secondary" : "bg-tertiary"}`} />
-                </span>
-                <span className="text-sm font-semibold">{status}</span>
+            <div className="relative">
+              {/* Hyperparameters - centered */}
+              <div className="max-w-2xl mx-auto relative">
+                {(isTraining && !isPaused) && (
+                  <>
+                    <span className="absolute -inset-[3px] rounded-3xl rainbow-border-glow" />
+                    <span className="absolute -inset-[1px] rounded-3xl rainbow-border-lg" />
+                  </>
+                )}
+                <div className="relative bg-surface-container-low p-8 rounded-3xl">
+                  <div className="space-y-10">
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-end">
+                        <label className="font-headline font-semibold text-on-surface">Acceptance Criteria</label>
+                        <span className="text-tertiary font-headline font-bold text-base">{acceptanceCriteria}</span>
+                      </div>
+                      <GlassDropdown
+                        value={acceptanceCriteria}
+                        options={["60%", "70%", "75%", "80%", "85%", "90%", "95%"]}
+                        onChange={setAcceptanceCriteria}
+                        disabled={locked}
+                      />
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-end">
+                        <label className="font-headline font-semibold text-on-surface">Learning Rate</label>
+                        <span className="text-tertiary font-headline font-bold text-base">{learningRate}</span>
+                      </div>
+                      <GlassDropdown
+                        value={learningRate}
+                        options={["1e-2", "1e-3", "1e-4", "1e-5", "1e-6"]}
+                        onChange={setLearningRate}
+                        disabled={locked}
+                      />
+                      <p className="text-xs text-on-surface-variant italic">Suggested for Adam Optimizer: 1e-4 - 1e-3</p>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-end">
+                        <label className="font-headline font-semibold text-on-surface">Epochs</label>
+                        <span className="text-tertiary font-headline font-bold text-base">{epochs} iterations</span>
+                      </div>
+                      <GlassDropdown
+                        value={epochs}
+                        options={["5", "10", "20", "30", "50", "100"]}
+                        onChange={setEpochs}
+                        disabled={locked}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  {(isTraining || progress > 0) && (
+                    <div className="mt-8 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <span className="relative flex h-2.5 w-2.5">
+                            {isTraining && !isPaused && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-tertiary opacity-75" />}
+                            <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${!isTraining && progress >= 100 ? "bg-tertiary" : isPaused ? "bg-secondary" : "bg-tertiary"}`} />
+                          </span>
+                          <span className="text-xs font-semibold text-on-surface-variant">
+                            {!isTraining && progress >= 100 ? "Complete" : isPaused ? "Paused" : "Training in progress..."}
+                          </span>
+                        </div>
+                        <span className="text-sm font-headline font-bold text-tertiary">{Math.min(progress, 100).toFixed(1)}%</span>
+                      </div>
+                      <div className="relative h-3 w-full bg-surface-container-highest rounded-full overflow-hidden">
+                        <div
+                          className="absolute top-0 left-0 h-full bg-gradient-to-r from-primary to-tertiary transition-all duration-500 rounded-full"
+                          style={{ width: `${Math.min(progress, 100)}%` }}
+                        />
+                        {isTraining && !isPaused && (
+                          <div
+                            className="absolute top-0 left-0 h-full bg-[linear-gradient(45deg,rgba(255,255,255,0.1)_25%,transparent_25%,transparent_50%,rgba(255,255,255,0.1)_50%,rgba(255,255,255,0.1)_75%,transparent_75%,transparent)] bg-[length:1rem_1rem] animate-[move_1s_linear_infinite] rounded-full"
+                            style={{ width: `${Math.min(progress, 100)}%` }}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Completed state */}
+                  {!isTraining && progress >= 100 && (
+                    <div className="mt-8 p-4 rounded-2xl bg-tertiary/10 border border-tertiary/20 flex items-center gap-3">
+                      <span className="material-symbols-outlined text-tertiary">check_circle</span>
+                      <span className="text-sm font-semibold text-tertiary">Training complete!</span>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="mt-8 flex flex-col items-center gap-4 pt-6 border-t border-outline-variant/10">
+                    {!isTraining && progress < 100 && (
+                      <button
+                        onClick={handleStart}
+                        className="w-full max-w-xs py-4 liquid-glass-primary-solid text-on-primary font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                      >
+                        Start Training
+                        <span className="material-symbols-outlined text-sm">rocket_launch</span>
+                      </button>
+                    )}
+
+                    {isTraining && (
+                      <button
+                        onClick={handlePauseResume}
+                        className={`w-full max-w-xs py-4 rounded-full font-bold text-sm uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 ${
+                          isPaused
+                            ? "liquid-glass-primary-solid text-on-primary"
+                            : "liquid-glass-error text-on-surface"
+                        }`}
+                      >
+                        {isPaused ? (
+                          <>Resume Training<span className="material-symbols-outlined text-sm">play_arrow</span></>
+                        ) : (
+                          <>Pause Training<span className="material-symbols-outlined text-sm">pause</span></>
+                        )}
+                      </button>
+                    )}
+
+                    {!isTraining && progress >= 100 && (
+                      <button
+                        onClick={() => navigate("/dashboard")}
+                        className="w-full max-w-xs py-4 liquid-glass-primary-solid text-on-primary font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                      >
+                        Go to Dashboard
+                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                      </button>
+                    )}
+
+                    {!isTraining && progress < 100 && (
+                      <button
+                        onClick={() => navigate("/setup")}
+                        className="text-on-surface-variant text-sm hover:text-primary transition-colors"
+                      >
+                        Back
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Selected Classes - positioned to the right */}
+              {classList.length > 0 && (
+                <div className="hidden lg:block absolute top-0" style={{ left: 'calc(50% + 21rem + 2rem)', width: '14rem' }}>
+                  <div className="bg-surface-container-low p-6 rounded-3xl ghost-border">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="material-symbols-outlined text-primary text-sm">category</span>
+                      <span className="text-xs uppercase tracking-widest font-bold text-on-surface-variant">Selected Classes</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {classList.map((cls) => (
+                        <span key={cls} className="px-3 py-1.5 rounded-full text-xs font-medium liquid-glass text-on-surface">
+                          {cls}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-outline-variant/10">
+                      <div className="text-on-surface-variant text-xs">{classList.length} {classList.length === 1 ? "class" : "classes"} selected</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Real-time Charts */}
+            {metrics.length > 0 && (
+              <div className="max-w-4xl mx-auto mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Loss Chart */}
+                <div className="bg-surface-container-low rounded-3xl p-8 ghost-border flex flex-col items-center">
+                  <div className="flex items-center justify-between w-full mb-6">
+                    <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-error" /> Loss
+                    </h3>
+                    {latestMetric && (
+                      <span className="font-mono text-xs text-error">{latestMetric.trainLoss.toFixed(3)}</span>
+                    )}
+                  </div>
+                  <div className="w-full h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={metrics}>
+                        <XAxis dataKey="step" stroke="#40485d" tick={{ fill: "#a3aac4", fontSize: 10 }} />
+                        <YAxis stroke="#40485d" tick={{ fill: "#a3aac4", fontSize: 10 }} />
+                        <Tooltip
+                          contentStyle={{ background: "#060e20", border: "1px solid #40485d", color: "#dee5ff", fontSize: 11, borderRadius: "12px" }}
+                          formatter={(value: any, name: any) => [Number(value).toFixed(4), name === "trainLoss" ? "Train Loss" : "Val Loss"]}
+                        />
+                        <Line type="monotone" dataKey="trainLoss" stroke="#ff716c" strokeWidth={2} dot={false} name="trainLoss" />
+                        <Line type="monotone" dataKey="valLoss" stroke="#a68cff" strokeWidth={2} dot={false} name="valLoss" strokeDasharray="4 2" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex items-center gap-4 mt-4">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3 h-[2px] bg-error rounded" />
+                      <span className="text-[10px] text-on-surface-variant">Train</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3 h-[2px] bg-secondary rounded" style={{ borderTop: "2px dashed #a68cff", height: 0 }} />
+                      <span className="text-[10px] text-on-surface-variant">Validation</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Accuracy Chart */}
+                <div className="bg-surface-container-low rounded-3xl p-8 ghost-border flex flex-col items-center">
+                  <div className="flex items-center justify-between w-full mb-6">
+                    <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-tertiary" /> Accuracy
+                    </h3>
+                    {latestMetric && (
+                      <span className="font-mono text-xs text-tertiary">{(latestMetric.accuracy * 100).toFixed(1)}%</span>
+                    )}
+                  </div>
+                  <div className="w-full h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={metrics}>
+                        <XAxis dataKey="step" stroke="#40485d" tick={{ fill: "#a3aac4", fontSize: 10 }} />
+                        <YAxis stroke="#40485d" tick={{ fill: "#a3aac4", fontSize: 10 }} domain={[0, 1]} />
+                        <Tooltip
+                          contentStyle={{ background: "#060e20", border: "1px solid #40485d", color: "#dee5ff", fontSize: 11, borderRadius: "12px" }}
+                          formatter={(value: any) => [(Number(value) * 100).toFixed(2) + "%", "Accuracy"]}
+                        />
+                        <Line type="monotone" dataKey="accuracy" stroke="#81ecff" strokeWidth={2} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
               </div>
             )}
-
-            <div className="bg-surface-container-low p-8 rounded-3xl ghost-border">
-              <div className="space-y-10">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-end">
-                    <label className="font-headline font-semibold text-on-surface">Acceptance Criteria</label>
-                    <span className="text-tertiary font-headline font-bold text-base">{acceptanceCriteria}</span>
-                  </div>
-                  <GlassDropdown
-                    value={acceptanceCriteria}
-                    options={["60%", "70%", "75%", "80%", "85%", "90%", "95%"]}
-                    onChange={setAcceptanceCriteria}
-                    disabled={isTraining}
-                  />
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex justify-between items-end">
-                    <label className="font-headline font-semibold text-on-surface">Learning Rate</label>
-                    <span className="text-tertiary font-headline font-bold text-base">{learningRate}</span>
-                  </div>
-                  <GlassDropdown
-                    value={learningRate}
-                    options={["1e-2", "1e-3", "1e-4", "1e-5", "1e-6"]}
-                    onChange={setLearningRate}
-                    disabled={isTraining}
-                  />
-                  <p className="text-xs text-on-surface-variant italic">Suggested for Adam Optimizer: 1e-4 - 1e-3</p>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex justify-between items-end">
-                    <label className="font-headline font-semibold text-on-surface">Epochs</label>
-                    <span className="text-tertiary font-headline font-bold text-base">{epochs} iterations</span>
-                  </div>
-                  <GlassDropdown
-                    value={epochs}
-                    options={["5", "10", "20", "30", "50", "100"]}
-                    onChange={setEpochs}
-                    disabled={isTraining}
-                  />
-                </div>
-              </div>
-
-              <div className="mt-8 flex flex-col items-center gap-4 pt-6 border-t border-outline-variant/10">
-                <button
-                  onClick={handleStart}
-                  disabled={isTraining && !isPaused}
-                  className="w-full max-w-xs py-4 liquid-glass-primary-solid text-on-primary font-bold text-sm uppercase tracking-widest rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                >
-                  {isTraining ? (
-                    <>Training...<span className="material-symbols-outlined text-sm animate-spin">progress_activity</span></>
-                  ) : (
-                    <>Start Training<span className="material-symbols-outlined text-sm">rocket_launch</span></>
-                  )}
-                </button>
-                {isTraining && (
-                  <button
-                    onClick={handlePause}
-                    className="px-8 py-2 liquid-glass text-primary font-semibold text-sm rounded-full"
-                  >
-                    {isPaused ? "Resume" : "Pause"}
-                  </button>
-                )}
-                <button
-                  onClick={() => navigate("/setup")}
-                  className="text-on-surface-variant text-sm hover:text-primary transition-colors"
-                >
-                  Back
-                </button>
-              </div>
-            </div>
           </div>
         </main>
       </div>

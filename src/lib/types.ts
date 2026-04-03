@@ -9,6 +9,7 @@ export type Session = {
     architecture: "deeplabv3+" | "unet_attention"
     task: "medical" | "realtime"
     status: "pending" | "running" | "completed" | "failed"
+    classes?: string
     apiKey?: string
     createdAt: string
 }

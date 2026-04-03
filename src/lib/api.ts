@@ -37,11 +37,11 @@ export async function getSessions() {
     return res.json()
 }
 
-export async function createSession(name: string, architecture: string, task: string) {
+export async function createSession(name: string, architecture: string, task: string, classes?: string) {
     const res = await fetch(`${BASE_URL}/sessions`, {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ name, architecture, task }),
+        body: JSON.stringify({ name, architecture, task, classes: classes || null }),
     })
     return res.json()
 }
@@ -51,6 +51,14 @@ export async function getSession(id: string) {
         headers: authHeaders(),
     })
     return res.json()
+}
+
+export async function deleteSession(id: string) {
+    const res = await fetch(`${BASE_URL}/sessions/${id}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+    })
+    if (!res.ok) throw new Error("Failed to delete session")
 }
 
 export async function generateApiKey(sessionId: string) {

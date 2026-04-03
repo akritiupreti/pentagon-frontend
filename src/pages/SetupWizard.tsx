@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { imageStore } from "./ImageStore"
-import { getSessions } from "../lib/api"
+import { getSessions, deleteSession } from "../lib/api"
 import { Session } from "../lib/types"
 import Navbar from "../components/Navbar"
 
@@ -39,6 +39,7 @@ export default function SetupWizard() {
   const [selected, setSelected] = useState<string[]>([])
   const [existingSessions, setExistingSessions] = useState<Session[]>([])
   const [loadingSessions, setLoadingSessions] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
 
   const stepIndex = STEPS.indexOf(step)
   const viewIndex = STEPS.indexOf(activeView)
@@ -114,6 +115,14 @@ export default function SetupWizard() {
     navigate(`/training-config?type=${session.task}&name=${encodeURIComponent(session.name)}`)
   }
 
+  async function handleDeleteSession(id: string) {
+    try {
+      await deleteSession(id)
+      setExistingSessions((prev) => prev.filter((s) => s.id !== id))
+    } catch {}
+    setDeleteConfirm(null)
+  }
+
   function handleNameNext() {
     if (!modelName.trim()) return
     goTo("classes")
@@ -186,20 +195,27 @@ export default function SetupWizard() {
         ) : existingSessions.length > 0 ? (
           <div className="space-y-3">
             {existingSessions.map((session) => (
-              <button
-                key={session.id}
-                onClick={() => handleSelectExisting(session)}
-                className="w-full p-5 rounded-2xl text-left liquid-glass hover:bg-white/10 transition-all flex items-center gap-4"
-              >
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-primary text-sm">model_training</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-headline font-bold text-sm truncate">{session.name}</div>
-                  <div className="text-on-surface-variant text-xs">{session.architecture} · {session.task}</div>
-                </div>
-                <span className="material-symbols-outlined text-on-surface-variant text-sm">chevron_right</span>
-              </button>
+              <div key={session.id} className="relative">
+                <button
+                  onClick={() => handleSelectExisting(session)}
+                  className="w-full p-5 rounded-2xl text-left liquid-glass hover:bg-white/10 transition-all flex items-center gap-4"
+                >
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-primary text-sm">model_training</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-headline font-bold text-sm truncate">{session.name}</div>
+                    <div className="text-on-surface-variant text-xs">{session.architecture} · {session.task === "medical" ? "Medical" : "Real Time"}</div>
+                  </div>
+                  <span className="material-symbols-outlined text-on-surface-variant text-sm">chevron_right</span>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setDeleteConfirm(session.id) }}
+                  className="absolute right-14 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant/40 hover:text-error hover:bg-error/10 transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">delete</span>
+                </button>
+              </div>
             ))}
             <button
               onClick={() => goTo("type")}
@@ -350,6 +366,37 @@ export default function SetupWizard() {
           </div>
         </main>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-surface-container-low rounded-3xl p-8 ghost-border max-w-sm w-full mx-4 shadow-[0_24px_48px_rgba(0,0,0,0.5)]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center">
+                <span className="material-symbols-outlined text-error">warning</span>
+              </div>
+              <h3 className="font-headline font-bold text-lg">Delete Model</h3>
+            </div>
+            <p className="text-on-surface-variant text-sm mb-8">
+              Are you sure you want to delete this model? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="px-6 py-2 rounded-full liquid-glass text-on-surface text-sm font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteSession(deleteConfirm)}
+                className="px-6 py-2 rounded-full liquid-glass-error text-on-surface text-sm font-bold"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

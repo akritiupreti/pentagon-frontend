@@ -104,6 +104,12 @@ export default function SessionDetail() {
                 <p className="text-on-surface-variant text-sm">{session.architecture} · {session.task}</p>
               </div>
               <div className="flex gap-4 mb-1">
+                <button
+                  onClick={() => navigate(`/training-config?type=${session.task}&name=${encodeURIComponent(session.name)}${session.classes ? `&classes=${encodeURIComponent(session.classes)}` : ""}`)}
+                  className="px-6 py-2 rounded-full liquid-glass-primary text-on-surface text-sm font-medium flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-sm">tune</span> Configure
+                </button>
                 <Link to="/dashboard" className="px-6 py-2 rounded-full liquid-glass text-on-surface text-sm font-medium flex items-center gap-2">
                   <span className="material-symbols-outlined text-sm">arrow_back</span> Dashboard
                 </Link>
@@ -149,41 +155,60 @@ export default function SessionDetail() {
                 )}
               </div>
 
-              {/* API Key & Intervention */}
-              <div className="col-span-12 lg:col-span-4 bg-surface-container rounded-3xl p-6 ghost-border glass-panel overflow-hidden flex flex-col justify-between">
-                <div>
-                  <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant mb-6">API Key</h3>
-                  {apiKey ? (
-                    <div className="space-y-3">
-                      <code className="block text-xs text-on-surface/70 bg-surface-container-lowest p-3 rounded-xl font-mono break-all">
-                        {keyVisible ? apiKey : "••••••••••••••••••••••••••••••••"}
-                      </code>
-                      <button onClick={() => setKeyVisible(!keyVisible)} className="text-xs text-primary hover:underline">
-                        {keyVisible ? "Hide" : "Reveal"}
+              {/* API Key, Classes & Intervention */}
+              <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
+                <div className="bg-surface-container rounded-3xl p-6 ghost-border glass-panel overflow-hidden flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant mb-6">API Key</h3>
+                    {apiKey ? (
+                      <div className="space-y-3">
+                        <code className="block text-xs text-on-surface/70 bg-surface-container-lowest p-3 rounded-xl font-mono break-all">
+                          {keyVisible ? apiKey : "••••••••••••••••••••••••••••••••"}
+                        </code>
+                        <button onClick={() => setKeyVisible(!keyVisible)} className="text-xs text-primary hover:underline">
+                          {keyVisible ? "Hide" : "Reveal"}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleGenerateKey}
+                        disabled={generatingKey}
+                        className="px-6 py-2 rounded-full liquid-glass text-primary text-sm font-semibold disabled:opacity-50"
+                      >
+                        {generatingKey ? "Generating..." : "Generate API Key"}
                       </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={handleGenerateKey}
-                      disabled={generatingKey}
-                      className="px-6 py-2 rounded-full liquid-glass text-primary text-sm font-semibold disabled:opacity-50"
+                    )}
+                  </div>
+                  <div className="mt-8 pt-6 border-t border-outline-variant/10">
+                    <Link
+                      to="/dashboard/intervention"
+                      className="flex items-center gap-3 p-4 rounded-2xl bg-secondary/10 border border-secondary/20 hover:bg-secondary/20 transition-colors"
                     >
-                      {generatingKey ? "Generating..." : "Generate API Key"}
-                    </button>
-                  )}
+                      <span className="material-symbols-outlined text-secondary">psychology</span>
+                      <div>
+                        <p className="text-xs font-bold text-on-surface">Human Intervention</p>
+                        <p className="text-[10px] text-on-surface-variant">Review escalated samples</p>
+                      </div>
+                    </Link>
+                  </div>
                 </div>
-                <div className="mt-8 pt-6 border-t border-outline-variant/10">
-                  <Link
-                    to="/dashboard/intervention"
-                    className="flex items-center gap-3 p-4 rounded-2xl bg-secondary/10 border border-secondary/20 hover:bg-secondary/20 transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-secondary">psychology</span>
-                    <div>
-                      <p className="text-xs font-bold text-on-surface">Human Intervention</p>
-                      <p className="text-[10px] text-on-surface-variant">Review escalated samples</p>
+
+                {/* Selected Classes */}
+                {session.classes && (
+                  <div className="bg-surface-container rounded-3xl p-6 ghost-border glass-panel">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="material-symbols-outlined text-primary text-sm">category</span>
+                      <span className="text-xs uppercase tracking-widest font-bold text-on-surface-variant">Selected Classes</span>
                     </div>
-                  </Link>
-                </div>
+                    <div className="flex flex-wrap gap-2">
+                      {session.classes.split(",").filter((c) => c.trim()).map((cls) => (
+                        <span key={cls} className="px-3 py-1.5 rounded-full text-xs font-medium liquid-glass text-on-surface">
+                          {cls.trim()}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Charts */}

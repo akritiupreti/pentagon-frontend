@@ -16,8 +16,11 @@ export default function Navbar() {
   return (
     <nav className="fixed top-0 w-full z-50 bg-slate-950/60 backdrop-filter backdrop-blur-xl shadow-2xl shadow-blue-900/20 flex justify-between items-center px-8 h-16 font-headline tracking-wide">
       <div className="flex items-center gap-8">
-        <Link to="/" className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-          FusionAI
+        <Link to="/" className="flex items-center gap-2">
+          <span className="material-symbols-outlined bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent" style={{ fontSize: '1.75rem' }}>neurology</span>
+          <span className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+            FusionAI
+          </span>
         </Link>
         <div className="hidden md:flex gap-6 items-center">
           {navLinks.map((link) => (
