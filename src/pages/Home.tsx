@@ -1,15 +1,17 @@
 import { Link } from "react-router-dom"
+import NeuronBackground from "../components/NeuronBackground"
 
 export default function Home() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-surface-dim relative overflow-hidden">
+      <NeuronBackground />
       <div className="absolute bottom-[-10%] right-[-5%] w-96 h-96 bg-primary/10 rounded-full blur-[120px]" />
       <div className="absolute top-[10%] left-[20%] w-64 h-64 bg-secondary/5 rounded-full blur-[80px]" />
 
       <div className="text-center relative z-10">
         <div className="flex items-center justify-center gap-3 mb-6">
-          <span className="material-symbols-outlined text-primary text-4xl">cloud_done</span>
-          <span className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent font-headline">
+          <span className="material-symbols-outlined bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent" style={{ fontSize: '4.5rem' }}>neurology</span>
+          <span className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent font-headline">
             FusionAI
           </span>
         </div>

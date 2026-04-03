@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { login } from "../lib/api"
+import NeuronBackground from "../components/NeuronBackground"
 
 export default function Login() {
   const navigate = useNavigate()
@@ -33,19 +34,13 @@ export default function Login() {
     <div className="min-h-screen flex flex-col md:flex-row overflow-hidden">
       {/* Hero Side */}
       <div className="hidden md:flex w-7/12 relative bg-surface-dim overflow-hidden">
-        <div className="absolute inset-0 z-0">
-          <img
-            alt="AI Landscape"
-            className="w-full h-full object-cover opacity-40 mix-blend-luminosity scale-110"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuBh3FHAyHiKj3ds1yI3h11f16WKofmN6x0wThfs9h_k_n_wpSa3EGM6qVewiHMEVPEpRvYgRhNBLSYOXGkDzH5BE5IjOb3RNieAmkNj5ps6yzmyQ7YbK8WfLjK3bneHfLxmE-pqb9HdSWbHrdUKqObCcPHRSqXZ6hSZ5UaentG4MgXTXV6qUouRfDbLvwj-0p2-R6TvdzFWDJNekNCMUVTRzw8OYHNpUEMvc7z-D6iIwdmg6zIY7A9Qd1GEz9mnljc0wo9doWKp-_M"
-          />
-          <div className="absolute inset-0 bg-gradient-to-tr from-surface-dim via-transparent to-primary/10" />
-        </div>
+        <NeuronBackground />
+        <div className="absolute inset-0 bg-gradient-to-tr from-surface-dim via-transparent to-primary/10 z-[1]" />
         <div className="relative z-10 p-20 flex flex-col justify-between w-full h-full">
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary text-3xl">cloud_done</span>
-              <span className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+              <span className="material-symbols-outlined bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent" style={{ fontSize: '4rem' }}>neurology</span>
+              <span className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                 FusionAI
               </span>
             </div>
