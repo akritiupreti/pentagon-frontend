@@ -8,7 +8,7 @@ export default function Footer() {
           </a>
         ))}
       </div>
-      <div className="text-slate-400 font-body text-xs uppercase tracking-widest">© 2025 Synthetic Horizon AI</div>
+      <div className="text-slate-400 font-body text-xs uppercase tracking-widest">© 2025 FusionAI</div>
     </footer>
   )
 }

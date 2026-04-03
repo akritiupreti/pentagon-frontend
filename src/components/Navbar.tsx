@@ -7,8 +7,8 @@ export default function Navbar() {
 
   const navLinks = [
     { label: "Dashboard", href: "/dashboard" },
-    { label: "Models", href: "/train-or-label" },
-    { label: "Datasets", href: "/add-image-folder" },
+    { label: "Models", href: "/setup" },
+    { label: "Datasets", href: "/setup" },
   ]
 
   const isActive = (href: string) => location.pathname.startsWith(href)
@@ -17,7 +17,7 @@ export default function Navbar() {
     <nav className="fixed top-0 w-full z-50 bg-slate-950/60 backdrop-filter backdrop-blur-xl shadow-2xl shadow-blue-900/20 flex justify-between items-center px-8 h-16 font-headline tracking-wide">
       <div className="flex items-center gap-8">
         <Link to="/" className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-          Synthetic Horizon
+          FusionAI
         </Link>
         <div className="hidden md:flex gap-6 items-center">
           {navLinks.map((link) => (

@@ -10,7 +10,7 @@ export default function Home() {
         <div className="flex items-center justify-center gap-3 mb-6">
           <span className="material-symbols-outlined text-primary text-4xl">cloud_done</span>
           <span className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent font-headline">
-            Synthetic Horizon
+            FusionAI
           </span>
         </div>
         <h1 className="text-5xl font-extrabold font-headline tracking-tighter text-on-surface mb-4">

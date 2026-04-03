@@ -18,7 +18,7 @@ export default function Login() {
       const res = await login(email, password)
       if (res.access_token) {
         localStorage.setItem("token", res.access_token)
-        navigate("/train-or-label")
+        navigate("/setup")
       } else {
         setError(res.detail || "Invalid email or password")
       }
@@ -46,7 +46,7 @@ export default function Login() {
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-3xl">cloud_done</span>
               <span className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                Synthetic Horizon
+                FusionAI
               </span>
             </div>
             <div className="pt-12">
@@ -55,7 +55,7 @@ export default function Login() {
                 <span className="text-primary-fixed">Intelligence.</span>
               </h1>
               <p className="mt-6 text-on-surface-variant text-lg max-w-md leading-relaxed">
-                Join the ethereal engine where data flows like liquid and models evolve in real-time.
+                Join the platform where models evolve in real-time.
               </p>
             </div>
           </div>
@@ -78,8 +78,8 @@ export default function Login() {
       <main className="flex-1 flex items-center justify-center p-6 md:p-12 lg:p-24 bg-surface-dim relative">
         <div className="w-full max-w-md space-y-8 relative z-10">
           <div className="text-center md:text-left">
-            <h2 className="text-3xl font-extrabold text-on-surface tracking-tight">Access Horizon</h2>
-            <p className="text-on-surface-variant mt-2">Initialize your session to continue</p>
+            <h2 className="text-3xl font-extrabold text-on-surface tracking-tight">Login to <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">FusionAI</span></h2>
+            <p className="text-on-surface-variant mt-2">Sign in to your account</p>
           </div>
 
           <div className="flex items-center gap-4 py-2">
@@ -92,7 +92,7 @@ export default function Login() {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2 ml-4" htmlFor="email">
-                  Work Email
+                  Email
                 </label>
                 <div className="relative">
                   <span className="absolute left-5 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant text-sm">alternate_email</span>
@@ -102,7 +102,7 @@ export default function Login() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    placeholder="name@company.com"
+                    placeholder="you@example.com"
                     className="w-full bg-surface-container-lowest/50 backdrop-blur-md border-none focus:ring-1 focus:ring-tertiary py-3.5 pl-12 pr-4 rounded-full text-on-surface placeholder:text-outline/50 transition-all outline-none ghost-border"
                   />
                 </div>
@@ -110,7 +110,7 @@ export default function Login() {
               <div>
                 <div className="flex justify-between items-center mb-2 ml-4 mr-4">
                   <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider" htmlFor="password">
-                    Access Token
+                    Password
                   </label>
                 </div>
                 <div className="relative">
@@ -145,15 +145,15 @@ export default function Login() {
               disabled={loading}
               className="w-full py-4 rounded-full font-bold text-sm uppercase tracking-widest liquid-glass-primary text-on-surface hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
             >
-              {loading ? "Initializing..." : "Initialize Session"}
+              {loading ? "Logging in..." : "Login"}
             </button>
           </form>
 
           <div className="pt-8 text-center">
             <p className="text-on-surface-variant text-sm">
-              New to the horizon?{" "}
+              New here?{" "}
               <Link to="/register" className="text-primary font-bold ml-1 hover:underline underline-offset-4 decoration-primary/30 transition-all">
-                Create an identity
+                Create an account
               </Link>
             </p>
           </div>

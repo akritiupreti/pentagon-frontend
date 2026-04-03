@@ -49,7 +49,7 @@ export default function Register() {
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-3xl">cloud_done</span>
               <span className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                Synthetic Horizon
+                FusionAI
               </span>
             </div>
             <div className="pt-12">
@@ -58,7 +58,7 @@ export default function Register() {
                 <span className="text-primary-fixed">Intelligence.</span>
               </h1>
               <p className="mt-6 text-on-surface-variant text-lg max-w-md leading-relaxed">
-                Create your identity and join the next era of synthetic computation.
+                Create your account and start training models.
               </p>
             </div>
           </div>
@@ -78,37 +78,37 @@ export default function Register() {
       </div>
 
       {/* Form Side */}
-      <main className="flex-1 flex items-center justify-center p-6 md:p-12 lg:p-24 bg-surface-dim relative">
-        <div className="w-full max-w-md space-y-8 relative z-10">
+      <main className="flex-1 flex items-center justify-center p-6 md:p-8 lg:p-12 bg-surface-dim relative">
+        <div className="w-full max-w-md space-y-5 relative z-10">
           <div className="text-center md:text-left">
-            <h2 className="text-3xl font-extrabold text-on-surface tracking-tight">Create Identity</h2>
-            <p className="text-on-surface-variant mt-2">Register to access the platform</p>
+            <h2 className="text-3xl font-extrabold text-on-surface tracking-tight">Sign up for <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">FusionAI</span></h2>
+            <p className="text-on-surface-variant mt-2">Create your account</p>
           </div>
 
-          <div className="flex items-center gap-4 py-2">
+          <div className="flex items-center gap-4 py-1">
             <div className="h-[1px] flex-1 bg-outline-variant opacity-20" />
             <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-semibold">Enter credentials</span>
             <div className="h-[1px] flex-1 bg-outline-variant opacity-20" />
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2 ml-4" htmlFor="email">
-                  Work Email
+                  Email
                 </label>
                 <div className="relative">
                   <span className="absolute left-5 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant text-sm">alternate_email</span>
                   <input
                     id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
-                    placeholder="name@company.com"
+                    placeholder="you@example.com"
                     className="w-full bg-surface-container-lowest/50 backdrop-blur-md border-none focus:ring-1 focus:ring-tertiary py-3.5 pl-12 pr-4 rounded-full text-on-surface placeholder:text-outline/50 transition-all outline-none ghost-border"
                   />
                 </div>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2 ml-4" htmlFor="password">
-                  Access Token
+                  Password
                 </label>
                 <div className="relative">
                   <span className="absolute left-5 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant text-sm">lock</span>
@@ -121,7 +121,7 @@ export default function Register() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2 ml-4" htmlFor="confirm">
-                  Confirm Token
+                  Confirm Password
                 </label>
                 <div className="relative">
                   <span className="absolute left-5 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant text-sm">lock</span>
@@ -144,13 +144,13 @@ export default function Register() {
               type="submit" disabled={loading}
               className="w-full py-4 rounded-full font-bold text-sm uppercase tracking-widest liquid-glass-primary text-on-surface hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
             >
-              {loading ? "Creating Identity..." : "Create Identity"}
+              {loading ? "Creating account..." : "Create Account"}
             </button>
           </form>
 
-          <div className="pt-8 text-center">
+          <div className="pt-4 text-center">
             <p className="text-on-surface-variant text-sm">
-              Already have an identity?{" "}
+              Already have an account?{" "}
               <Link to="/login" className="text-primary font-bold ml-1 hover:underline underline-offset-4 decoration-primary/30 transition-all">
                 Sign In
               </Link>
