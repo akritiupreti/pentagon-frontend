@@ -2,11 +2,11 @@ import Navbar from "../components/Navbar"
 import Footer from "../components/Footer"
 
 const team = [
-  { name: "Binod Subedi", role: "Team Lead", icon: "shield_person", desc: "Project architecture, system design & team coordination" },
-  { name: "Akriti Upreti", role: "Full Stack Engineer", icon: "code", desc: "UI/UX design, React components & frontend-backend integration" },
-  { name: "Biraj Chhetri", role: "Full Stack Engineer", icon: "code", desc: "Backend APIs, UI/UX design & frontend-backend integration" },
-  { name: "Birendra Bohara", role: "DevOps Engineer", icon: "cloud", desc: "AWS services, infrastructure, CI/CD pipelines & deployment" },
-  { name: "Utsav Paudel", role: "ML Engineer", icon: "psychology", desc: "Model training pipeline, knowledge distillation & AI agent" },
+  { name: "Binod Subedi", role: "Team Lead", icon: "shield_person" },
+  { name: "Akriti Upreti", role: "Full Stack Engineer", icon: "code" },
+  { name: "Biraj Chhetri", role: "Full Stack Engineer", icon: "code" },
+  { name: "Birendra Bohara", role: "DevOps Engineer", icon: "cloud" },
+  { name: "Utsav Paudel", role: "ML Engineer", icon: "psychology" },
 ]
 
 const milestones = [
@@ -69,20 +69,17 @@ export default function About() {
               {team.map((member, i) => (
                 <div
                   key={member.name}
-                  className={`bg-surface-container-low rounded-3xl p-6 ghost-border hover:translate-y-[-4px] transition-all duration-300 ${
+                  className={`bg-surface-container-low rounded-3xl p-6 ghost-border hover:translate-y-[-4px] transition-all duration-300 flex items-center gap-4 ${
                     i === 0 ? "sm:col-span-2 lg:col-span-1" : ""
                   }`}
                 >
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-primary text-xl">{member.icon}</span>
-                    </div>
-                    <div>
-                      <div className="font-headline font-bold text-sm">{member.name}</div>
-                      <div className="text-primary text-xs font-semibold">{member.role}</div>
-                    </div>
+                  <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-primary text-xl">{member.icon}</span>
                   </div>
-                  <p className="text-on-surface-variant text-xs leading-relaxed">{member.desc}</p>
+                  <div>
+                    <div className="font-headline font-bold text-sm">{member.name}</div>
+                    <div className="text-primary text-xs font-semibold">{member.role}</div>
+                  </div>
                 </div>
               ))}
             </div>
