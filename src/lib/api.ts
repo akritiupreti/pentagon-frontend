@@ -136,6 +136,28 @@ export async function uploadDataset(sessionId: string, imageCount: number) {
     return res.json()
 }
 
+export async function getPresignedUrls(sessionId: string, files: { name: string; type: string }[]) {
+    const res = await fetch(`${BASE_URL}/sessions/presigned-urls`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+            session_id: sessionId,
+            filenames: files.map(f => f.name),
+            content_types: files.map(f => f.type || "application/octet-stream"),
+        }),
+    })
+    return res.json()
+}
+
+export async function uploadFileToS3(url: string, file: File) {
+    const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+    })
+    if (!res.ok) throw new Error(`S3 upload failed for ${file.name}: ${res.status}`)
+}
+
 export async function downloadModel(sessionId: string) {
     const res = await fetch(`${BASE_URL}/sessions/${sessionId}/model/download`, {
         headers: authHeaders(),

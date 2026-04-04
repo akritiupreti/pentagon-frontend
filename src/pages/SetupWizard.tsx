@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { imageStore } from "./ImageStore"
-import { getSessions, deleteSession } from "../lib/api"
+import { getSessions, deleteSession, getPresignedUrls, uploadFileToS3 } from "../lib/api"
 import { Session } from "../lib/types"
 import Navbar from "../components/Navbar"
 
@@ -39,6 +39,8 @@ export default function SetupWizard() {
   const [selected, setSelected] = useState<string[]>([])
   const [existingSessions, setExistingSessions] = useState<Session[]>([])
   const [loadingSessions, setLoadingSessions] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadToast, setUploadToast] = useState<{ text: string; type: "success" | "error" } | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
 
   const stepIndex = STEPS.indexOf(step)
@@ -111,10 +113,37 @@ export default function SetupWizard() {
     goTo("name")
   }
 
-  function handleSelectExisting(session: Session) {
-    const params = new URLSearchParams({ type: session.task, name: session.name })
-    if (session.classes) params.set("classes", session.classes)
-    navigate(`/training-config?${params.toString()}`)
+  async function uploadToS3(sessionId: string) {
+    const files = imageStore.getFiles()
+    if (files.length === 0) throw new Error("No files to upload")
+    const fileInfo = files.map((f) => ({ name: f.name, type: f.type }))
+    const res = await getPresignedUrls(sessionId, fileInfo)
+    if (!res.urls || res.urls.length === 0) throw new Error("Failed to get upload URLs")
+    const results = await Promise.allSettled(
+      res.urls.map((u: { url: string; filename: string }) => {
+        const file = files.find((f) => f.name === u.filename)
+        return file ? uploadFileToS3(u.url, file) : Promise.reject(new Error(`File not found: ${u.filename}`))
+      })
+    )
+    const failed = results.filter((r) => r.status === "rejected")
+    if (failed.length > 0) throw new Error(`${failed.length} of ${results.length} files failed to upload`)
+  }
+
+  async function handleSelectExisting(session: Session) {
+    setUploading(true)
+    try {
+      await uploadToS3(session.id)
+      setUploadToast({ text: "Dataset uploaded successfully!", type: "success" })
+    } catch {
+      setUploadToast({ text: "Dataset upload failed. Continuing anyway.", type: "error" })
+    }
+    setUploading(false)
+    setTimeout(() => {
+      setUploadToast(null)
+      const params = new URLSearchParams({ type: session.task, name: session.name })
+      if (session.classes) params.set("classes", session.classes)
+      navigate(`/training-config?${params.toString()}`)
+    }, 1500)
   }
 
   async function handleDeleteSession(id: string) {
@@ -130,9 +159,20 @@ export default function SetupWizard() {
     goTo("classes")
   }
 
-  function handleFinish() {
+  async function handleFinish() {
     if (selected.length === 0) return
-    navigate(`/training-config?type=${modelType}&name=${encodeURIComponent(modelName)}&classes=${encodeURIComponent(selected.join(","))}`)
+    setUploading(true)
+    try {
+      await uploadToS3(modelName.replace(/\s+/g, "-").toLowerCase())
+      setUploadToast({ text: "Dataset uploaded successfully!", type: "success" })
+    } catch {
+      setUploadToast({ text: "Dataset upload failed. Continuing anyway.", type: "error" })
+    }
+    setUploading(false)
+    setTimeout(() => {
+      setUploadToast(null)
+      navigate(`/training-config?type=${modelType}&name=${encodeURIComponent(modelName)}&classes=${encodeURIComponent(selected.join(","))}`)
+    }, 1500)
   }
 
   const allClasses = modelType === "medical" ? MEDICAL_CLASSES : REALTIME_CLASSES
@@ -368,6 +408,31 @@ export default function SetupWizard() {
           </div>
         </main>
       </div>
+
+      {/* Uploading Overlay */}
+      {(uploading || uploadToast) && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
+          {uploading && (
+            <>
+              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
+              <p className="text-on-surface font-headline font-bold text-lg">Uploading dataset to S3...</p>
+              <p className="text-on-surface-variant text-sm mt-1">This may take a moment</p>
+            </>
+          )}
+          {!uploading && uploadToast && (
+            <div className={`backdrop-blur-xl rounded-2xl px-8 py-6 text-center flex flex-col items-center gap-3 ${
+              uploadToast.type === "success"
+                ? "bg-tertiary/15 border border-tertiary/25 text-tertiary shadow-[0_8px_32px_rgba(0,212,236,0.15)]"
+                : "bg-error/15 border border-error/25 text-error shadow-[0_8px_32px_rgba(255,113,108,0.15)]"
+            }`}>
+              <span className="material-symbols-outlined text-3xl">
+                {uploadToast.type === "success" ? "check_circle" : "error"}
+              </span>
+              <p className="font-semibold text-sm">{uploadToast.text}</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (

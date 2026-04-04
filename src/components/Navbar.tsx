@@ -28,8 +28,7 @@ export default function Navbar() {
 
   const navLinks = [
     { label: "Dashboard", href: "/dashboard" },
-    { label: "Models", href: "/setup" },
-    { label: "Datasets", href: "/setup" },
+    { label: "Setup", href: "/setup" },
   ]
 
   const isActive = (href: string) => location.pathname.startsWith(href)
