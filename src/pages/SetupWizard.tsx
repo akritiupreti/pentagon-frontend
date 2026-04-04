@@ -123,6 +123,8 @@ export default function SetupWizard() {
     const fileInfo = files.map((f) => ({ name: f.name, type: f.type }))
     const res = await getPresignedUrls(sessionId, fileInfo)
     if (!res.urls || res.urls.length === 0) throw new Error("Failed to get upload URLs")
+    // Store S3 URLs for inferencing
+    localStorage.setItem("datasetUrls", JSON.stringify(res.urls.map((u: { url: string }) => u.url)))
     const results = await Promise.allSettled(
       res.urls.map((u: { url: string; filename: string }) => {
         const file = files.find((f) => f.name === u.filename)

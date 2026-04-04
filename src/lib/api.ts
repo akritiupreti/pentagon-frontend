@@ -191,3 +191,30 @@ export async function suggestHyperparameters(imageCount: number, classes: string
     })
     return res.json()
 }
+
+const INFERENCE_ENDPOINT = "http://localhost:8000/inference/start" // TODO: replace with actual endpoint
+
+export async function startInferencing(payload: { urls: string[]; modelType: string; userId: string; sessionId: string }) {
+    const res = await fetch(INFERENCE_ENDPOINT, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(payload),
+    })
+    return res.json()
+}
+
+export async function createJob(sessionId: string, jobType: "training" | "inferencing") {
+    const res = await fetch(`${BASE_URL}/jobs`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ session_id: sessionId, job_type: jobType }),
+    })
+    return res.json()
+}
+
+export async function getJob(jobId: string) {
+    const res = await fetch(`${BASE_URL}/jobs/${jobId}`, {
+        headers: authHeaders(),
+    })
+    return res.json()
+}

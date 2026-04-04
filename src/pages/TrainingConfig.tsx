@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { createSession, uploadDataset, suggestHyperparameters } from "../lib/api"
+import { createSession, uploadDataset, suggestHyperparameters, startInferencing, createJob, getJob } from "../lib/api"
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import Navbar from "../components/Navbar"
 import GlassDropdown from "../components/GlassDropdown"
@@ -25,6 +25,9 @@ export default function TrainingConfig() {
   const [progress, setProgress] = useState(0)
   const [metrics, setMetrics] = useState<MetricPoint[]>([])
   const [toastMsg, setToastMsg] = useState<{ text: string; type: "success" | "info" | "error" } | null>(null)
+  const [isInferencing, setIsInferencing] = useState(false)
+  const [jobId, setJobId] = useState<string | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const initRan = useRef(false)
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const stepRef = useRef(0)
@@ -104,12 +107,70 @@ export default function TrainingConfig() {
     }
   }
 
+  // Long-poll job status
+  useEffect(() => {
+    if (!jobId) return
+    pollRef.current = setInterval(async () => {
+      try {
+        const job = await getJob(jobId)
+        if (job.is_completed) {
+          clearInterval(pollRef.current!)
+          pollRef.current = null
+          setIsTraining(false)
+          setIsInferencing(false)
+          setProgress(100)
+          showToast(`${job.job_type === "training" ? "Training" : "Inferencing"} complete!`, "success")
+          setJobId(null)
+        }
+      } catch {}
+    }, 3000)
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+  }, [jobId])
+
+  function getUserId(): string {
+    const token = localStorage.getItem("token")
+    if (!token) return ""
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]))
+      return payload.sub || ""
+    } catch { return "" }
+  }
+
+  async function handleInferencing() {
+    const storedUrls = localStorage.getItem("datasetUrls")
+    const urls: string[] = storedUrls ? JSON.parse(storedUrls) : []
+    if (urls.length === 0) { showToast("No dataset URLs found. Upload a dataset first.", "error"); return }
+    if (!sessionId) { showToast("No session found.", "error"); return }
+    setIsInferencing(true)
+    try {
+      // Create job record
+      const job = await createJob(sessionId, "inferencing")
+      if (job.id) setJobId(job.id)
+      // Fire off inferencing request
+      await startInferencing({
+        urls,
+        modelType: type === "medical" ? "medical" : "realtime",
+        userId: getUserId(),
+        sessionId,
+      })
+      showToast("Inferencing started! Polling for completion...", "info")
+    } catch {
+      showToast("Failed to start inferencing.", "error")
+      setIsInferencing(false)
+    }
+  }
+
   function handleStart() {
+    if (!sessionId) { showToast("No session found.", "error"); return }
     setIsTraining(true)
     setIsPaused(false)
     setProgress(0)
     setMetrics([])
     stepRef.current = 0
+    // Create job record
+    createJob(sessionId, "training").then((job) => {
+      if (job.id) setJobId(job.id)
+    }).catch(() => {})
   }
 
   function handlePauseResume() {
@@ -256,13 +317,23 @@ export default function TrainingConfig() {
                   {/* Actions */}
                   <div className="mt-8 flex flex-col items-center gap-4 pt-6 border-t border-outline-variant/10">
                     {!isTraining && progress < 100 && (
-                      <button
-                        onClick={handleStart}
-                        className="w-full max-w-xs py-4 liquid-glass-primary-solid text-on-primary font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                      >
-                        Start Training
-                        <span className="material-symbols-outlined text-sm">rocket_launch</span>
-                      </button>
+                      <div className="flex gap-3 w-full max-w-lg">
+                        <button
+                          onClick={handleInferencing}
+                          disabled={isInferencing}
+                          className="flex-1 py-4 px-6 liquid-glass text-on-surface font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                          {isInferencing ? "Starting..." : "Start Inferencing"}
+                          <span className="material-symbols-outlined text-sm">play_circle</span>
+                        </button>
+                        <button
+                          onClick={handleStart}
+                          className="flex-1 py-4 px-6 liquid-glass-primary-solid text-on-primary font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                        >
+                          Start Training
+                          <span className="material-symbols-outlined text-sm">rocket_launch</span>
+                        </button>
+                      </div>
                     )}
 
                     {isTraining && (
