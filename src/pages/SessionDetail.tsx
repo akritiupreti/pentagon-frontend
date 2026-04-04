@@ -4,7 +4,6 @@ import { getSession, generateApiKey } from "../lib/api"
 import { Session, Metric, AgentDecision } from "../lib/types"
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import Navbar from "../components/Navbar"
-import SideNav from "../components/SideNav"
 import Footer from "../components/Footer"
 
 export default function SessionDetail() {
@@ -81,42 +80,40 @@ export default function SessionDetail() {
   return (
     <div className="bg-surface-dim text-on-surface font-body min-h-screen flex flex-col">
       <Navbar />
-      <div className="flex min-h-screen pt-16">
-        <SideNav phase="Phase 3: Execution" />
-        <main className="ml-64 pt-0 flex-1">
-          <div className="p-8 max-w-7xl mx-auto">
+      <main className="pt-24 flex-1">
+        <div className="p-8 max-w-7xl mx-auto">
             {/* Header */}
-            <header className="flex justify-between items-end mb-12">
-              <div className="max-w-2xl">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-widest border border-primary/20">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+            <header className="mb-12">
+              <Link to="/dashboard" className="inline-flex px-6 py-2 rounded-full liquid-glass text-on-surface text-sm font-medium items-center gap-2 mb-6">
+                <span className="material-symbols-outlined text-sm">arrow_back</span> Dashboard
+              </Link>
+              <div className="flex justify-between items-end">
+                <div className="max-w-2xl">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-widest border border-primary/20">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+                      </span>
+                      {session.status}
                     </span>
-                    {session.status}
-                  </span>
-                  <span className="text-on-surface-variant text-xs">Session ID: {session.id}</span>
+                    <span className="text-on-surface-variant text-xs">Session ID: {session.id}</span>
+                  </div>
+                  <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface mb-1">
+                    {session.name}
+                  </h1>
+                  <p className="text-on-surface-variant text-sm">{session.architecture} · {session.task === "realtime" ? "Real Time" : session.task === "medical" ? "Medical" : session.task.charAt(0).toUpperCase() + session.task.slice(1)}</p>
                 </div>
-                <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface mb-1">
-                  {session.name}
-                </h1>
-                <p className="text-on-surface-variant text-sm">{session.architecture} · {session.task}</p>
-              </div>
-              <div className="flex gap-4 mb-1">
                 <button
                   onClick={() => {
                     const p = new URLSearchParams({ type: session.task, name: session.name })
                     if (session.classes) p.set("classes", session.classes)
                     navigate(`/training-config?${p.toString()}`)
                   }}
-                  className="px-6 py-2 rounded-full liquid-glass-primary text-on-surface text-sm font-medium flex items-center gap-2"
+                  className="px-6 py-2 rounded-full liquid-glass-primary text-on-surface text-sm font-medium flex items-center gap-2 mb-1"
                 >
                   <span className="material-symbols-outlined text-sm">tune</span> Configure
                 </button>
-                <Link to="/dashboard" className="px-6 py-2 rounded-full liquid-glass text-on-surface text-sm font-medium flex items-center gap-2">
-                  <span className="material-symbols-outlined text-sm">arrow_back</span> Dashboard
-                </Link>
               </div>
             </header>
 
@@ -296,10 +293,9 @@ export default function SessionDetail() {
                 </div>
               </div>
             </div>
-          </div>
-          <Footer />
-        </main>
-      </div>
+        </div>
+        <Footer />
+      </main>
     </div>
   )
 }
