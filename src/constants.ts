@@ -115,7 +115,7 @@ export const categories = [
   { name: "Footpath", value: 4 },
 ];
 
-export const brushSizes = [3, 7, 13, 19, 29];
+export const brushSizes = [3, 7, 13, 19, 29, 39, 69, 99];
 
 // ── Pill panel style ─────────────────────────────────────────────────────────
 export const pillPanel: React.CSSProperties = {
