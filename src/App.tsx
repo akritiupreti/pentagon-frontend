@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import VerifyEmail from './pages/VerifyEmail'
 import SetupWizard from './pages/SetupWizard'
 import TrainingConfig from './pages/TrainingConfig'
 import LabelTool from './pages/LabelTool'
@@ -17,6 +18,7 @@ function App() {
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/setup" element={<SetupWizard />} />
                 <Route path="/training-config" element={<TrainingConfig />} />
                 <Route path="/label-tool" element={<LabelTool />} />

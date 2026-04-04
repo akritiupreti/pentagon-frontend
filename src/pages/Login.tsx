@@ -1,15 +1,25 @@
-import { useState } from "react"
-import { useNavigate, Link } from "react-router-dom"
+import { useEffect, useState } from "react"
+import { useNavigate, useSearchParams, Link } from "react-router-dom"
 import { login } from "../lib/api"
 import NeuronBackground from "../components/NeuronBackground"
 
 export default function Login() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [successMsg, setSuccessMsg] = useState("")
+
+  useEffect(() => {
+    if (searchParams.get("verified") === "true") {
+      setSuccessMsg("Email verified! You can now sign in.")
+      window.history.replaceState({}, "", "/login")
+      setTimeout(() => setSuccessMsg(""), 5000)
+    }
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -20,6 +30,8 @@ export default function Login() {
       if (res.access_token) {
         localStorage.setItem("token", res.access_token)
         navigate("/setup")
+      } else if (res.detail === "Please verify your email first") {
+        navigate(`/verify-email?email=${encodeURIComponent(email)}`)
       } else {
         setError(res.detail || "Invalid email or password")
       }
@@ -32,6 +44,19 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row overflow-hidden">
+      {/* Floating success toast */}
+      {successMsg && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-[fadeSlideDown_0.3s_ease-out]">
+          <div className="bg-tertiary/15 border border-tertiary/25 text-tertiary backdrop-blur-xl rounded-full px-6 py-3 text-sm font-semibold flex items-center gap-3 shadow-[0_8px_32px_rgba(0,212,236,0.15)]">
+            <span className="material-symbols-outlined text-sm">check_circle</span>
+            {successMsg}
+            <button onClick={() => setSuccessMsg("")} className="ml-2 hover:text-on-surface transition-colors">
+              <span className="material-symbols-outlined text-sm">close</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Hero Side */}
       <div className="hidden md:flex w-7/12 relative bg-surface-dim overflow-hidden">
         <NeuronBackground />

@@ -30,6 +30,24 @@ export async function login(email: string, password: string) {
     return res.json()
 }
 
+export async function confirmEmail(email: string, code: string) {
+    const res = await fetch(`${BASE_URL}/auth/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code }),
+    })
+    return res.json()
+}
+
+export async function resendCode(email: string) {
+    const res = await fetch(`${BASE_URL}/auth/resend-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+    })
+    return res.json()
+}
+
 export async function getSessions() {
     const res = await fetch(`${BASE_URL}/sessions`, {
         headers: authHeaders(),

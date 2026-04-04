@@ -162,6 +162,11 @@ input, select, button {
   to { background-position: 1rem 0; }
 }
 
+@keyframes fadeSlideDown {
+  from { opacity: 0; transform: translate(-50%, -1rem); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
 @keyframes rainbow-spin {
   0% { --rainbow-angle: 0deg; }
   100% { --rainbow-angle: 360deg; }

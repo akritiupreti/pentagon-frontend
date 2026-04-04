@@ -22,7 +22,7 @@ export default function Register() {
     try {
       const res = await register(email, password)
       if (res.message) {
-        navigate("/login")
+        navigate(`/verify-email?email=${encodeURIComponent(email)}`)
       } else {
         setError(res.detail || "Registration failed")
       }
