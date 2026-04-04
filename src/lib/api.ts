@@ -225,3 +225,68 @@ export async function getLatestMetric(jobId: string) {
     })
     return res.json()
 }
+
+// ── AgentCore Training API ──
+
+export async function bootstrapSession(sessionId: string, params: Record<string, any>) {
+    const res = await fetch(`${BASE_URL}/sessions/bootstrap`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ session_id: sessionId, current_params: params }),
+    })
+    return res.json()
+}
+
+export async function getEpochMetrics(sessionId: string, runId?: string) {
+    const params = runId ? `?run_id=${runId}` : ""
+    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/metrics${params}`, {
+        headers: authHeaders(),
+    })
+    return res.json()
+}
+
+export async function updateAgentStatus(sessionId: string, status: string, stopReason?: string) {
+    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/agent-status`, {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify({ status, stop_reason: stopReason }),
+    })
+    return res.json()
+}
+
+export async function getCurrentRun(sessionId: string) {
+    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/current-run`, {
+        headers: authHeaders(),
+    })
+    return res.json()
+}
+
+export async function getOrchestratorLog(sessionId: string) {
+    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/orchestrator-log`, {
+        headers: authHeaders(),
+    })
+    return res.json()
+}
+
+export async function getTrainingReport(sessionId: string) {
+    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/training-report`, {
+        headers: authHeaders(),
+    })
+    return res.json()
+}
+
+export async function getSessionProposals(sessionId: string) {
+    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/hyperparameter-proposals`, {
+        headers: authHeaders(),
+    })
+    return res.json()
+}
+
+export async function reviewProposal(sessionId: string, proposalId: string, body: { status: string; final_params?: Record<string, any>; rejection_reason?: string; reviewer_suggestion?: string; decided_by?: string }) {
+    const res = await fetch(`${BASE_URL}/sessions/${sessionId}/hyperparameter-proposals/${proposalId}`, {
+        method: "PATCH",
+        headers: authHeaders(),
+        body: JSON.stringify(body),
+    })
+    return res.json()
+}

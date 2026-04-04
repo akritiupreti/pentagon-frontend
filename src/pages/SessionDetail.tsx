@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
-import { getSession, generateApiKey } from "../lib/api"
-import { Session, Metric, AgentDecision } from "../lib/types"
+import { getSession, generateApiKey, getEpochMetrics, getOrchestratorLog } from "../lib/api"
+import { Session } from "../lib/types"
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import Navbar from "../components/Navbar"
 import Footer from "../components/Footer"
@@ -12,20 +12,21 @@ export default function SessionDetail() {
   const id = params.id as string
 
   const [session, setSession] = useState<Session | null>(null)
-  const [metrics, setMetrics] = useState<Metric[]>([])
-  const [decisions, setDecisions] = useState<AgentDecision[]>([])
+  const [metrics, setMetrics] = useState<any[]>([])
+  const [decisions, setDecisions] = useState<any[]>([])
   const [apiKey, setApiKey] = useState<string | null>(null)
   const [keyVisible, setKeyVisible] = useState(false)
   const [generatingKey, setGeneratingKey] = useState(false)
   const [loading, setLoading] = useState(true)
   const wsRef = useRef<WebSocket | null>(null)
   const decisionsEndRef = useRef<HTMLDivElement>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     const token = localStorage.getItem("token")
     if (!token) { navigate("/login"); return }
-    if (id) { fetchSession(); connectWebSocket(token) }
-    return () => { wsRef.current?.close() }
+    if (id) { fetchSession(); fetchData(); connectWebSocket(token); startPolling() }
+    return () => { wsRef.current?.close(); if (pollRef.current) clearInterval(pollRef.current) }
   }, [id, navigate])
 
   useEffect(() => {
@@ -38,6 +39,40 @@ export default function SessionDetail() {
       setSession(data)
       if (data.apiKey) setApiKey(data.apiKey)
     } catch {} finally { setLoading(false) }
+  }
+
+  async function fetchData() {
+    try {
+      const [metricsData, logsData] = await Promise.all([
+        getEpochMetrics(id).catch(() => []),
+        getOrchestratorLog(id).catch(() => []),
+      ])
+      if (Array.isArray(metricsData) && metricsData.length > 0) setMetrics(metricsData)
+      if (Array.isArray(logsData) && logsData.length > 0) {
+        setDecisions(logsData.reverse().map((l: any) => ({
+          message: `[${l.decision}] ${l.rationale || ""} ${l.agents_called ? "→ " + l.agents_called.join(", ") : ""}`.trim(),
+          timestamp: l.created_at,
+        })))
+      }
+    } catch {}
+  }
+
+  function startPolling() {
+    pollRef.current = setInterval(async () => {
+      try {
+        const [metricsData, logsData] = await Promise.all([
+          getEpochMetrics(id).catch(() => []),
+          getOrchestratorLog(id).catch(() => []),
+        ])
+        if (Array.isArray(metricsData) && metricsData.length > 0) setMetrics(metricsData)
+        if (Array.isArray(logsData) && logsData.length > 0) {
+          setDecisions(logsData.reverse().map((l: any) => ({
+            message: `[${l.decision}] ${l.rationale || ""} ${l.agents_called ? "→ " + l.agents_called.join(", ") : ""}`.trim(),
+            timestamp: l.created_at,
+          })))
+        }
+      } catch {}
+    }, 5000)
   }
 
   function connectWebSocket(token: string) {
@@ -59,7 +94,8 @@ export default function SessionDetail() {
   }
 
   const latestMetric = metrics[metrics.length - 1]
-  const progress = latestMetric ? ((latestMetric.epoch || 0) / 20 * 100).toFixed(1) : "0"
+  const totalEpochs = latestMetric?.epoch || 20
+  const progress = latestMetric ? ((latestMetric.epoch || 0) / totalEpochs * 100).toFixed(1) : "0"
 
   if (loading) {
     return (
@@ -142,11 +178,11 @@ export default function SessionDetail() {
                     </div>
                     <div className="p-4 bg-surface-container rounded-2xl">
                       <p className="text-[10px] text-on-surface-variant uppercase mb-1">Loss</p>
-                      <p className="text-xl font-headline font-bold text-error">{latestMetric.loss?.toFixed(4) || "—"}</p>
+                      <p className="text-xl font-headline font-bold text-error">{(latestMetric.loss ?? latestMetric.val_loss)?.toFixed(4) || "—"}</p>
                     </div>
                     <div className="p-4 bg-surface-container rounded-2xl">
                       <p className="text-[10px] text-on-surface-variant uppercase mb-1">Accuracy</p>
-                      <p className="text-xl font-headline font-bold text-tertiary">{latestMetric.accuracy?.toFixed(4) || "—"}</p>
+                      <p className="text-xl font-headline font-bold text-tertiary">{(latestMetric.val_accuracy ?? latestMetric.accuracy)?.toFixed(4) || "—"}</p>
                     </div>
                     <div className="p-4 bg-surface-container rounded-2xl">
                       <p className="text-[10px] text-on-surface-variant uppercase mb-1">Status</p>
@@ -220,7 +256,7 @@ export default function SessionDetail() {
                     <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-error" /> Training Loss
                     </h3>
-                    {latestMetric && <span className="font-mono text-xs text-error">Current: {latestMetric.loss?.toFixed(3)}</span>}
+                    {latestMetric && <span className="font-mono text-xs text-error">Current: {(latestMetric.loss ?? latestMetric.val_loss)?.toFixed(3)}</span>}
                   </div>
                   <div className="flex-grow">
                     {metrics.length === 0 ? (
@@ -232,6 +268,7 @@ export default function SessionDetail() {
                           <YAxis stroke="#40485d" tick={{ fill: "#a3aac4", fontSize: 11 }} />
                           <Tooltip contentStyle={{ background: "#060e20", border: "1px solid #40485d", color: "#dee5ff", fontSize: 12, borderRadius: "12px" }} />
                           <Line type="monotone" dataKey="loss" stroke="#ff716c" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="val_loss" stroke="#a68cff" strokeWidth={2} dot={false} strokeDasharray="4 2" />
                         </LineChart>
                       </ResponsiveContainer>
                     )}
@@ -244,7 +281,7 @@ export default function SessionDetail() {
                     <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-tertiary" /> Validation Accuracy
                     </h3>
-                    {latestMetric && <span className="font-mono text-xs text-tertiary">Current: {latestMetric.accuracy?.toFixed(3)}</span>}
+                    {latestMetric && <span className="font-mono text-xs text-tertiary">Current: {((latestMetric.val_accuracy ?? latestMetric.accuracy) * 100)?.toFixed(1)}%</span>}
                   </div>
                   <div className="flex-grow">
                     {metrics.length === 0 ? (
@@ -255,7 +292,7 @@ export default function SessionDetail() {
                           <XAxis dataKey="epoch" stroke="#40485d" tick={{ fill: "#a3aac4", fontSize: 11 }} />
                           <YAxis stroke="#40485d" tick={{ fill: "#a3aac4", fontSize: 11 }} />
                           <Tooltip contentStyle={{ background: "#060e20", border: "1px solid #40485d", color: "#dee5ff", fontSize: 12, borderRadius: "12px" }} />
-                          <Line type="monotone" dataKey="accuracy" stroke="#81ecff" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="val_accuracy" stroke="#81ecff" strokeWidth={2} dot={false} />
                         </LineChart>
                       </ResponsiveContainer>
                     )}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { createSession, uploadDataset, suggestHyperparameters, startInferencing, createJob, getJob, getLatestMetric } from "../lib/api"
+import { createSession, uploadDataset, suggestHyperparameters, startInferencing, createJob, getJob, getLatestMetric, bootstrapSession, getEpochMetrics } from "../lib/api"
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import Navbar from "../components/Navbar"
 import GlassDropdown from "../components/GlassDropdown"
@@ -29,6 +29,7 @@ export default function TrainingConfig() {
   const [jobId, setJobId] = useState<string | null>(null)
   const [jobType, setJobType] = useState<"training" | "inferencing" | null>(null)
   const [isStopped, setIsStopped] = useState<"training" | "inferencing" | null>(null)
+  const [runId, setRunId] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const initRan = useRef(false)
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -47,9 +48,9 @@ export default function TrainingConfig() {
     setTimeout(() => setToastMsg(null), 5000)
   }
 
-  // Simulated progress + metrics
+  // Simulated progress + metrics (fallback when no real backend metrics arrive)
   useEffect(() => {
-    if (isTraining && !isPaused) {
+    if (isTraining && !isPaused && !runId) {
       progressRef.current = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 100) {
@@ -75,7 +76,7 @@ export default function TrainingConfig() {
       clearInterval(progressRef.current)
     }
     return () => { if (progressRef.current) clearInterval(progressRef.current) }
-  }, [isTraining, isPaused])
+  }, [isTraining, isPaused, runId])
 
   async function init() {
     setIsLoadingParams(true)
@@ -109,15 +110,32 @@ export default function TrainingConfig() {
     }
   }
 
-  // Long-poll job status (+ metrics for training only)
+  // Long-poll job status (+ real epoch metrics for training)
   useEffect(() => {
     if (!jobId) return
     pollRef.current = setInterval(async () => {
       try {
         const job = await getJob(jobId)
 
-        // Fetch metrics only for training jobs
-        if (jobType === "training") {
+        // Fetch real epoch metrics for training jobs with a run
+        if (jobType === "training" && sessionId && runId) {
+          const allMetrics = await getEpochMetrics(sessionId, runId)
+          if (Array.isArray(allMetrics) && allMetrics.length > 0) {
+            const totalEpochs = parseInt(epochs) || 10
+            const mapped = allMetrics.map((m: any) => ({
+              step: m.epoch,
+              trainLoss: m.loss ?? 0,
+              valLoss: m.val_loss ?? 0,
+              accuracy: m.val_accuracy ?? m.accuracy ?? 0,
+            }))
+            setMetrics(mapped)
+            const latestEpoch = allMetrics[allMetrics.length - 1].epoch ?? 0
+            setProgress(Math.min((latestEpoch / totalEpochs) * 100, 99.9))
+          }
+        }
+
+        // Fallback: check old metrics table for training without a run
+        if (jobType === "training" && !runId) {
           const metric = await getLatestMetric(jobId)
           if (metric?.data) {
             const d = metric.data
@@ -145,11 +163,12 @@ export default function TrainingConfig() {
           showToast(`${job.job_type === "training" ? "Training" : "Inferencing"} complete!`, "success")
           setJobId(null)
           setJobType(null)
+          setRunId(null)
         }
       } catch {}
     }, 3000)
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
-  }, [jobId, jobType])
+  }, [jobId, jobType, runId, sessionId])
 
   function getUserId(): string {
     const token = localStorage.getItem("token")
@@ -200,6 +219,7 @@ export default function TrainingConfig() {
     setIsPaused(false)
     setJobId(null)
     setJobType(null)
+    setRunId(null)
     setIsStopped("training")
     showToast("Training stopped.", "info")
   }
@@ -208,6 +228,11 @@ export default function TrainingConfig() {
     if (!sessionId) { showToast("No session found.", "error"); return }
     setIsStopped(null)
     setIsTraining(true)
+    // Bootstrap a new run and create job
+    const params = { learning_rate: learningRate, epochs, acceptance_criteria: acceptanceCriteria }
+    bootstrapSession(sessionId, params).then((res) => {
+      if (res.run_id) setRunId(res.run_id)
+    }).catch(() => {})
     createJob(sessionId, "training").then((job) => {
       if (job.id) { setJobId(job.id); setJobType("training") }
     }).catch(() => {})
@@ -227,6 +252,11 @@ export default function TrainingConfig() {
     setProgress(0)
     setMetrics([])
     stepRef.current = 0
+    // Bootstrap a session run with current hyperparameters
+    const params = { learning_rate: learningRate, epochs, acceptance_criteria: acceptanceCriteria }
+    bootstrapSession(sessionId, params).then((res) => {
+      if (res.run_id) setRunId(res.run_id)
+    }).catch(() => {})
     // Create job record
     createJob(sessionId, "training").then((job) => {
       if (job.id) { setJobId(job.id); setJobType("training") }
