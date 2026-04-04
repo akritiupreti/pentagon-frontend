@@ -62,8 +62,8 @@ export const GSTYLE = `
 
   .g-btn-filled       { background: #1a73e8; color: #fff; box-shadow: 0 1px 2px rgba(60,64,67,.3),0 1px 3px 1px rgba(60,64,67,.15); }
   .g-btn-filled:hover { box-shadow: 0 2px 6px rgba(26,115,232,.45); }
-  .g-btn-outlined       { background: rgba(255,255,255,0.0); color: #1a73e8; border: 1px solid #dadce0; }
-  .g-btn-outlined:hover { background: rgba(232,240,254,0.7); }
+  .g-btn-outlined       { background: rgba(255,255,255,0.0); color: #1a73e8; border: 2px solid #9aa0a6; }
+  .g-btn-outlined:hover { background: rgba(232,240,254,0.7); border-color: #1a73e8; }
   .g-btn-purple       { background: #7c3aed; color: #fff; box-shadow: 0 1px 2px rgba(60,64,67,.3); }
   .g-btn-purple:hover { box-shadow: 0 2px 6px rgba(124,58,237,.45); }
   .g-btn-indigo       { background: #3730a3; color: #fff; box-shadow: 0 1px 2px rgba(60,64,67,.3); }
@@ -93,12 +93,11 @@ export const GSTYLE = `
   .zoom-badge {
     font-family: 'Google Sans', 'Roboto', sans-serif;
     font-size: 12px; font-weight: 500; color: #5f6368;
-    background: rgba(255,255,255,0.88);
-    border: 1px solid #dadce0; border-radius: 20px;
+    background: transparent;
+    border: none; border-radius: 20px;
     padding: 0 8px; height: 26px;
     display: inline-flex; align-items: center;
     white-space: nowrap;
-    backdrop-filter: blur(8px);
   }
 `;
 

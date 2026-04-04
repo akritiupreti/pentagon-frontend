@@ -870,7 +870,8 @@ const App = () => {
       <div
         style={{
           ...pillPanel,
-          left: "8%",
+          left: 16,
+          transform: "none",
           gap: "4px",
           padding: "6px 14px",
           bottom: 20,
