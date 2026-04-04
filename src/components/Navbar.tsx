@@ -68,6 +68,16 @@ export default function Navbar() {
       </div>
       <div className="flex items-center gap-6">
         <Link
+          to="/about"
+          className={`hidden md:block transition-colors scale-95 active:duration-100 ${
+            isActive("/about")
+              ? "text-blue-400 border-b-2 border-blue-500 pb-1"
+              : "text-slate-400 hover:text-blue-300"
+          }`}
+        >
+          About
+        </Link>
+        <Link
           to="/pricing"
           className={`hidden md:block transition-colors scale-95 active:duration-100 ${
             isActive("/pricing")

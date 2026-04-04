@@ -11,6 +11,7 @@ import Sessions from './pages/Sessions'
 import SessionDetail from './pages/SessionDetail'
 import Intervention from './pages/Intervention'
 import Pricing from './pages/Pricing'
+import About from './pages/About'
 
 function App() {
     return (
@@ -27,6 +28,7 @@ function App() {
                 <Route path="/dashboard/sessions" element={<Sessions />} />
                 <Route path="/dashboard/sessions/:id" element={<SessionDetail />} />
                 <Route path="/pricing" element={<Pricing />} />
+                <Route path="/about" element={<About />} />
                 <Route path="/dashboard/intervention" element={<Intervention />} />
                 {/* Redirect old routes to unified wizard */}
                 <Route path="/train-or-label" element={<Navigate to="/setup" replace />} />
