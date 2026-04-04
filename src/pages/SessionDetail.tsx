@@ -105,7 +105,11 @@ export default function SessionDetail() {
               </div>
               <div className="flex gap-4 mb-1">
                 <button
-                  onClick={() => navigate(`/training-config?type=${session.task}&name=${encodeURIComponent(session.name)}${session.classes ? `&classes=${encodeURIComponent(session.classes)}` : ""}`)}
+                  onClick={() => {
+                    const p = new URLSearchParams({ type: session.task, name: session.name })
+                    if (session.classes) p.set("classes", session.classes)
+                    navigate(`/training-config?${p.toString()}`)
+                  }}
                   className="px-6 py-2 rounded-full liquid-glass-primary text-on-surface text-sm font-medium flex items-center gap-2"
                 >
                   <span className="material-symbols-outlined text-sm">tune</span> Configure
