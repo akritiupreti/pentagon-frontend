@@ -63,12 +63,7 @@ export default function Register() {
           </div>
           <div className="flex items-center gap-12">
             <div className="flex flex-col">
-              <span className="text-primary-dim font-bold text-2xl">99.9%</span>
-              <span className="text-on-surface-variant text-xs uppercase tracking-widest">Uptime reliability</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-secondary font-bold text-2xl">1.2M+</span>
-              <span className="text-on-surface-variant text-xs uppercase tracking-widest">Models deployed</span>
+              <span className="text-on-surface-variant text-xs uppercase tracking-widest">AI-Powered Semantic Segmentation</span>
             </div>
           </div>
         </div>
@@ -157,13 +152,6 @@ export default function Register() {
           </div>
         </div>
 
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-6 md:left-auto md:right-12 md:translate-x-0">
-          {["Terms", "Privacy", "Status"].map((label) => (
-            <a key={label} href="#" className="text-[10px] uppercase tracking-widest text-on-surface-variant/40 hover:text-on-surface-variant transition-colors">
-              {label}
-            </a>
-          ))}
-        </div>
       </main>
     </div>
   )
