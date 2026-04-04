@@ -5,7 +5,7 @@ import { getSessions, deleteSession } from "../lib/api"
 import { Session } from "../lib/types"
 import Navbar from "../components/Navbar"
 
-const MEDICAL_CLASSES = ["Heart", "Kidney"]
+const MEDICAL_CLASSES = ["Heart", "Liver"]
 const REALTIME_CLASSES = ["Car", "Road"]
 
 type Step = "mode" | "upload" | "confirm" | "type" | "name" | "classes"
@@ -112,7 +112,9 @@ export default function SetupWizard() {
   }
 
   function handleSelectExisting(session: Session) {
-    navigate(`/training-config?type=${session.task}&name=${encodeURIComponent(session.name)}`)
+    const params = new URLSearchParams({ type: session.task, name: session.name })
+    if (session.classes) params.set("classes", session.classes)
+    navigate(`/training-config?${params.toString()}`)
   }
 
   async function handleDeleteSession(id: string) {
