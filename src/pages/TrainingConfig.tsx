@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { createSession, uploadDataset, suggestHyperparameters } from "../lib/api"
-import { toast, ToastContainer } from "react-toastify"
-import "react-toastify/dist/ReactToastify.css"
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import Navbar from "../components/Navbar"
 import GlassDropdown from "../components/GlassDropdown"
@@ -26,6 +24,7 @@ export default function TrainingConfig() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
   const [metrics, setMetrics] = useState<MetricPoint[]>([])
+  const [toastMsg, setToastMsg] = useState<{ text: string; type: "success" | "info" | "error" } | null>(null)
   const initRan = useRef(false)
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const stepRef = useRef(0)
@@ -38,6 +37,11 @@ export default function TrainingConfig() {
     init()
   }, [navigate])
 
+  function showToast(text: string, type: "success" | "info" | "error" = "info") {
+    setToastMsg({ text, type })
+    setTimeout(() => setToastMsg(null), 5000)
+  }
+
   // Simulated progress + metrics
   useEffect(() => {
     if (isTraining && !isPaused) {
@@ -46,7 +50,7 @@ export default function TrainingConfig() {
           if (prev >= 100) {
             clearInterval(progressRef.current!)
             setIsTraining(false)
-            toast.success("Training complete!", { position: "top-right", autoClose: 3000 })
+            showToast("Training complete!", "success")
             return 100
           }
           return prev + Math.random() * 1.5 + 0.3
@@ -80,21 +84,21 @@ export default function TrainingConfig() {
       const imageCountStr = localStorage.getItem("imageCount")
       const imageCount = imageCountStr ? parseInt(imageCountStr, 10) : 0
 
-      if (imageCount > 0 && classList.length > 0) {
+      if (classList.length > 0 && imageCount > 0) {
         const suggestions = await suggestHyperparameters(imageCount, classList)
         setAcceptanceCriteria(suggestions.acceptance_criteria || "80%")
         setEpochs(suggestions.epochs || "10")
         setLearningRate(suggestions.learning_rate || "1e-4")
 
         if (suggestions.from_claude) {
-          toast.success("Hyperparameters optimized by Claude!", { position: "top-right", autoClose: 3000 })
+          showToast("Hyperparameters optimized by Claude!", "success")
         } else {
-          toast.info("Using default hyperparameters. Configure AWS credentials for Claude optimization.", { position: "top-right", autoClose: 4000 })
+          showToast("Using default hyperparameters", "info")
         }
       }
     } catch (error) {
       console.error("Error initializing:", error)
-      toast.error("Failed to initialize. Using defaults.", { position: "top-right", autoClose: 3000 })
+      showToast("Failed to initialize. Using defaults.", "error")
     } finally {
       setIsLoadingParams(false)
     }
@@ -129,6 +133,25 @@ export default function TrainingConfig() {
 
   return (
     <>
+      {/* Floating Toast */}
+      {toastMsg && (
+        <div className="fixed top-20 right-6 z-[60] animate-[profileReveal_0.2s_ease-out]">
+          <div className={`backdrop-blur-xl rounded-full px-6 py-3 text-sm font-semibold flex items-center gap-3 ${
+            toastMsg.type === "success" ? "bg-tertiary/15 border border-tertiary/25 text-tertiary shadow-[0_8px_32px_rgba(0,212,236,0.15)]" :
+            toastMsg.type === "error" ? "bg-error/15 border border-error/25 text-error shadow-[0_8px_32px_rgba(255,113,108,0.15)]" :
+            "bg-primary/15 border border-primary/25 text-primary shadow-[0_8px_32px_rgba(137,172,255,0.15)]"
+          }`}>
+            <span className="material-symbols-outlined text-sm">
+              {toastMsg.type === "success" ? "check_circle" : toastMsg.type === "error" ? "error" : "info"}
+            </span>
+            {toastMsg.text}
+            <button onClick={() => setToastMsg(null)} className="ml-2 hover:opacity-70 transition-opacity">
+              <span className="material-symbols-outlined text-sm">close</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-surface-dim text-on-surface font-body min-h-screen flex flex-col">
         <Navbar />
         <main className="flex-1 pt-28 pb-12 px-6">
@@ -372,7 +395,6 @@ export default function TrainingConfig() {
           </div>
         </main>
       </div>
-      <ToastContainer position="top-right" autoClose={5000} hideProgressBar={false} newestOnTop={false} closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
     </>
   )
 }
