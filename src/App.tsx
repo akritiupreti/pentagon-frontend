@@ -1,19 +1,17 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Register from './pages/Register'
-import TrainOrLabel from './pages/TrainOrLabel'
-import ModelType from './pages/ModelType'
-import ModelName from './pages/ModelName'
-import ClassSelection from './pages/ClassSelection'
+import VerifyEmail from './pages/VerifyEmail'
+import SetupWizard from './pages/SetupWizard'
 import TrainingConfig from './pages/TrainingConfig'
-import AddNewModel from './pages/AddNewModel'
-import AddImageFolder from './pages/AddImageFolder'
 import LabelTool from './pages/LabelTool'
 import Dashboard from './pages/Dashboard'
 import Sessions from './pages/Sessions'
 import SessionDetail from './pages/SessionDetail'
 import Intervention from './pages/Intervention'
+import Pricing from './pages/Pricing'
+import About from './pages/About'
 
 function App() {
     return (
@@ -22,18 +20,23 @@ function App() {
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
-                <Route path="/train-or-label" element={<TrainOrLabel />} />
-                <Route path="/model-type" element={<ModelType />} />
-                <Route path="/model-name" element={<ModelName />} />
-                <Route path="/class-selection" element={<ClassSelection />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/setup" element={<SetupWizard />} />
                 <Route path="/training-config" element={<TrainingConfig />} />
-                <Route path="/add-new-model" element={<AddNewModel />} />
-                <Route path="/add-image-folder" element={<AddImageFolder />} />
                 <Route path="/label-tool" element={<LabelTool />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/dashboard/sessions" element={<Sessions />} />
                 <Route path="/dashboard/sessions/:id" element={<SessionDetail />} />
+                <Route path="/pricing" element={<Pricing />} />
+                <Route path="/about" element={<About />} />
                 <Route path="/dashboard/intervention" element={<Intervention />} />
+                {/* Redirect old routes to unified wizard */}
+                <Route path="/train-or-label" element={<Navigate to="/setup" replace />} />
+                <Route path="/add-image-folder" element={<Navigate to="/setup" replace />} />
+                <Route path="/add-new-model" element={<Navigate to="/setup" replace />} />
+                <Route path="/model-type" element={<Navigate to="/setup" replace />} />
+                <Route path="/model-name" element={<Navigate to="/setup" replace />} />
+                <Route path="/class-selection" element={<Navigate to="/setup" replace />} />
             </Routes>
         </Router>
     )

@@ -30,6 +30,31 @@ export async function login(email: string, password: string) {
     return res.json()
 }
 
+export async function confirmEmail(email: string, code: string) {
+    const res = await fetch(`${BASE_URL}/auth/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code }),
+    })
+    return res.json()
+}
+
+export async function resendCode(email: string) {
+    const res = await fetch(`${BASE_URL}/auth/resend-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+    })
+    return res.json()
+}
+
+export async function getMe() {
+    const res = await fetch(`${BASE_URL}/auth/me`, {
+        headers: authHeaders(),
+    })
+    return res.json()
+}
+
 export async function getSessions() {
     const res = await fetch(`${BASE_URL}/sessions`, {
         headers: authHeaders(),
@@ -37,11 +62,11 @@ export async function getSessions() {
     return res.json()
 }
 
-export async function createSession(name: string, architecture: string, task: string) {
+export async function createSession(name: string, architecture: string, task: string, classes?: string) {
     const res = await fetch(`${BASE_URL}/sessions`, {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ name, architecture, task }),
+        body: JSON.stringify({ name, architecture, task, classes: classes || null }),
     })
     return res.json()
 }
@@ -51,6 +76,14 @@ export async function getSession(id: string) {
         headers: authHeaders(),
     })
     return res.json()
+}
+
+export async function deleteSession(id: string) {
+    const res = await fetch(`${BASE_URL}/sessions/${id}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+    })
+    if (!res.ok) throw new Error("Failed to delete session")
 }
 
 export async function generateApiKey(sessionId: string) {
@@ -110,6 +143,28 @@ export async function uploadDataset(sessionId: string, imageCount: number) {
     return res.json()
 }
 
+export async function getPresignedUrls(sessionId: string, files: { name: string; type: string }[]) {
+    const res = await fetch(`${BASE_URL}/sessions/presigned-urls`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+            session_id: sessionId,
+            filenames: files.map(f => f.name),
+            content_types: files.map(f => f.type || "application/octet-stream"),
+        }),
+    })
+    return res.json()
+}
+
+export async function uploadFileToS3(url: string, file: File) {
+    const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+    })
+    if (!res.ok) throw new Error(`S3 upload failed for ${file.name}: ${res.status}`)
+}
+
 export async function downloadModel(sessionId: string) {
     const res = await fetch(`${BASE_URL}/sessions/${sessionId}/model/download`, {
         headers: authHeaders(),
@@ -133,6 +188,40 @@ export async function suggestHyperparameters(imageCount: number, classes: string
             image_size: 256,
             classes: classes,
         }),
+    })
+    return res.json()
+}
+
+const INFERENCE_ENDPOINT = "http://3.110.37.205:8000/segment-dataset" // TODO: replace with actual endpoint
+
+export async function startInferencing(payload: { keys: string[]; modelType: string; userId: string; sessionId: string }) {
+    const res = await fetch(INFERENCE_ENDPOINT, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(payload),
+    })
+    return res.json()
+}
+
+export async function createJob(sessionId: string, jobType: "training" | "inferencing") {
+    const res = await fetch(`${BASE_URL}/jobs`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ session_id: sessionId, job_type: jobType }),
+    })
+    return res.json()
+}
+
+export async function getJob(jobId: string) {
+    const res = await fetch(`${BASE_URL}/jobs/${jobId}`, {
+        headers: authHeaders(),
+    })
+    return res.json()
+}
+
+export async function getLatestMetric(jobId: string) {
+    const res = await fetch(`${BASE_URL}/jobs/${jobId}/metrics/latest`, {
+        headers: authHeaders(),
     })
     return res.json()
 }
