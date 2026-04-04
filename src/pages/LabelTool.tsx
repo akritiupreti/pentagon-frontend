@@ -168,15 +168,17 @@ const App = () => {
   const totalImages = files.length;
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Inject CSS once
+  // Inject CSS on mount, remove on unmount
   useEffect(() => {
     const id = "g-annotator-styles";
-    if (!document.getElementById(id)) {
-      const tag = document.createElement("style");
+    let tag = document.getElementById(id) as HTMLStyleElement | null;
+    if (!tag) {
+      tag = document.createElement("style");
       tag.id = id;
       tag.textContent = GSTYLE;
       document.head.appendChild(tag);
     }
+    return () => { tag?.remove(); };
   }, []);
 
   // ── Checkerboard background ─────────────────────────────────────────────────
