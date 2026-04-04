@@ -1,4 +1,4 @@
-const BASE_URL = "https://d3u251r4o065ue.cloudfront.net"
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
 
 function getToken() {
     if (typeof window === "undefined") return null
