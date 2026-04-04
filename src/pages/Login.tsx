@@ -14,6 +14,7 @@ export default function Login() {
   const [successMsg, setSuccessMsg] = useState("")
 
   useEffect(() => {
+    if (localStorage.getItem("token")) { navigate("/setup"); return }
     if (searchParams.get("verified") === "true") {
       setSuccessMsg("Email verified! You can now sign in.")
       window.history.replaceState({}, "", "/login")

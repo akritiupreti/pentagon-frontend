@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { register } from "../lib/api"
 import NeuronBackground from "../components/NeuronBackground"
@@ -10,6 +10,10 @@ export default function Register() {
   const [confirm, setConfirm] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (localStorage.getItem("token")) navigate("/setup")
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

@@ -1,7 +1,14 @@
-import { Link } from "react-router-dom"
+import { useEffect } from "react"
+import { Link, useNavigate } from "react-router-dom"
 import NeuronBackground from "../components/NeuronBackground"
 
 export default function Home() {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (localStorage.getItem("token")) navigate("/setup")
+  }, [])
+
   return (
     <main className="min-h-screen flex items-center justify-center bg-surface-dim relative overflow-hidden">
       <NeuronBackground />
