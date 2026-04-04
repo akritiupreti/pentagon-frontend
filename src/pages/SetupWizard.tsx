@@ -244,7 +244,8 @@ export default function SetupWizard() {
             <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         ) : existingSessions.length > 0 ? (
-          <div className="space-y-3">
+          <>
+          <div className="space-y-3 max-h-[280px] overflow-y-auto no-scrollbar">
             {existingSessions.map((session) => (
               <div key={session.id} className="relative">
                 <button
@@ -268,16 +269,17 @@ export default function SetupWizard() {
                 </button>
               </div>
             ))}
-            <button
-              onClick={() => goTo("type")}
-              className="w-full p-5 rounded-2xl text-left border-2 border-dashed border-outline-variant/30 hover:border-primary/50 transition-all flex items-center gap-4"
-            >
-              <div className="w-10 h-10 rounded-full liquid-glass-primary flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-primary text-sm">add</span>
-              </div>
-              <div className="font-headline font-bold text-sm">Add New Model</div>
-            </button>
           </div>
+          <button
+            onClick={() => goTo("type")}
+            className="w-full p-5 mt-3 rounded-2xl text-left border-2 border-dashed border-outline-variant/30 hover:border-primary/50 transition-all flex items-center gap-4"
+          >
+            <div className="w-10 h-10 rounded-full liquid-glass-primary flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-primary text-sm">add</span>
+            </div>
+            <div className="font-headline font-bold text-sm">Add New Model</div>
+          </button>
+          </>
         ) : (
           <button
             onClick={() => goTo("type")}
