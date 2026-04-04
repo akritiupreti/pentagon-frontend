@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { createSession, uploadDataset, suggestHyperparameters, startInferencing, createJob, getJob, getLatestMetric, bootstrapSession, getEpochMetrics } from "../lib/api"
+import { createSession, uploadDataset, suggestHyperparameters, startInferencing, startTraining, createJob, getJob, getLatestMetric, bootstrapSession, getEpochMetrics } from "../lib/api"
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import Navbar from "../components/Navbar"
 import GlassDropdown from "../components/GlassDropdown"
 
-type MetricPoint = { step: number; trainLoss: number; valLoss: number; accuracy: number }
+type MetricPoint = { step: number; trainLoss: number; valMiou: number; bestMiou: number }
 
 export default function TrainingConfig() {
   const navigate = useNavigate()
@@ -15,9 +15,13 @@ export default function TrainingConfig() {
   const classes = searchParams.get("classes") || ""
   const classList = classes ? classes.split(",").filter((c) => c.trim()) : []
 
-  const [acceptanceCriteria, setAcceptanceCriteria] = useState("80%")
   const [epochs, setEpochs] = useState("10")
   const [learningRate, setLearningRate] = useState("1e-4")
+  const [batchSize, setBatchSize] = useState("8")
+  const [valSplit, setValSplit] = useState("0.2")
+  const [momentum, setMomentum] = useState("0.9")
+  const [weightDecay, setWeightDecay] = useState("1e-4")
+  const [auxLossWeight, setAuxLossWeight] = useState("1.0")
   const [isTraining, setIsTraining] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [isLoadingParams, setIsLoadingParams] = useState(true)
@@ -68,8 +72,8 @@ export default function TrainingConfig() {
         setMetrics((prev) => [...prev, {
           step: s,
           trainLoss: 2.5 * decay + Math.random() * 0.15,
-          valLoss: 2.8 * decay + Math.random() * 0.2 + 0.05,
-          accuracy: Math.min(0.98, (1 - decay) * 0.95 + Math.random() * 0.02),
+          valMiou: Math.min(0.95, (1 - decay) * 0.85 + Math.random() * 0.02),
+          bestMiou: Math.min(0.95, (1 - decay) * 0.85),
         }])
       }, 500)
     } else if (progressRef.current) {
@@ -92,9 +96,13 @@ export default function TrainingConfig() {
 
       if (classList.length > 0 && imageCount > 0) {
         const suggestions = await suggestHyperparameters(imageCount, classList)
-        setAcceptanceCriteria(suggestions.acceptance_criteria || "80%")
         setEpochs(suggestions.epochs || "10")
         setLearningRate(suggestions.learning_rate || "1e-4")
+        setBatchSize(suggestions.batch_size || "8")
+        setValSplit(suggestions.val_split || "0.2")
+        setMomentum(suggestions.momentum || "0.9")
+        setWeightDecay(suggestions.weight_decay || "1e-4")
+        setAuxLossWeight(suggestions.aux_loss_weight || "1.0")
 
         if (suggestions.from_claude) {
           showToast("Hyperparameters optimized by Claude!", "success")
@@ -124,9 +132,9 @@ export default function TrainingConfig() {
             const totalEpochs = parseInt(epochs) || 10
             const mapped = allMetrics.map((m: any) => ({
               step: m.epoch,
-              trainLoss: m.loss ?? 0,
-              valLoss: m.val_loss ?? 0,
-              accuracy: m.val_accuracy ?? m.accuracy ?? 0,
+              trainLoss: m.loss ?? m.train_loss ?? 0,
+              valMiou: m.val_loss ?? m.val_miou ?? 0,
+              bestMiou: m.best_miou ?? 0,
             }))
             setMetrics(mapped)
             const latestEpoch = allMetrics[allMetrics.length - 1].epoch ?? 0
@@ -140,15 +148,15 @@ export default function TrainingConfig() {
           if (metric?.data) {
             const d = metric.data
             const epoch = d.epoch ?? 0
-            const totalEpochs = parseInt(epochs) || 10
+            const totalEpochs = d.total_epochs ?? parseInt(epochs) ?? 10
             setProgress(Math.min((epoch / totalEpochs) * 100, 99.9))
             setMetrics((prev) => {
               if (prev.length > 0 && prev[prev.length - 1].step === epoch) return prev
               return [...prev, {
                 step: epoch,
-                trainLoss: d.training_loss ?? d.trainLoss ?? 0,
-                valLoss: d.validation_loss ?? d.valLoss ?? 0,
-                accuracy: d.validation_accuracy ?? d.accuracy ?? 0,
+                trainLoss: d.train_loss ?? d.training_loss ?? d.trainLoss ?? 0,
+                valMiou: d.val_miou ?? d.val_loss ?? d.valLoss ?? 0,
+                bestMiou: d.best_miou ?? 0,
               }]
             })
           }
@@ -229,7 +237,7 @@ export default function TrainingConfig() {
     setIsStopped(null)
     setIsTraining(true)
     // Bootstrap a new run and create job
-    const params = { learning_rate: learningRate, epochs, acceptance_criteria: acceptanceCriteria }
+    const params = { learning_rate: learningRate, epochs, batch_size: batchSize, val_split: valSplit, momentum, weight_decay: weightDecay, aux_loss_weight: auxLossWeight }
     bootstrapSession(sessionId, params).then((res) => {
       if (res.run_id) setRunId(res.run_id)
     }).catch(() => {})
@@ -245,22 +253,51 @@ export default function TrainingConfig() {
     stepRef.current = 0
   }
 
-  function handleStart() {
+  function lrToFloat(lr: string): number {
+    const map: Record<string, number> = { "1e-2": 0.01, "1e-3": 0.001, "1e-4": 0.0001, "1e-5": 0.00001, "1e-6": 0.000001 }
+    return map[lr] ?? 0.0001
+  }
+
+  async function handleStart() {
     if (!sessionId) { showToast("No session found.", "error"); return }
+    const storedKeys = localStorage.getItem("datasetKeys")
+    const imageKeys: string[] = storedKeys ? JSON.parse(storedKeys) : []
+    if (imageKeys.length === 0) { showToast("No dataset found. Upload a dataset first.", "error"); return }
+
     setIsTraining(true)
     setIsPaused(false)
     setProgress(0)
     setMetrics([])
     stepRef.current = 0
-    // Bootstrap a session run with current hyperparameters
-    const params = { learning_rate: learningRate, epochs, acceptance_criteria: acceptanceCriteria }
+
+    // Create job record
+    const job = await createJob(sessionId, "training").catch(() => null)
+    if (job?.id) { setJobId(job.id); setJobType("training") }
+
+    const params = { learning_rate: learningRate, epochs, batch_size: batchSize, val_split: valSplit, momentum, weight_decay: weightDecay, aux_loss_weight: auxLossWeight }
     bootstrapSession(sessionId, params).then((res) => {
       if (res.run_id) setRunId(res.run_id)
     }).catch(() => {})
-    // Create job record
-    createJob(sessionId, "training").then((job) => {
-      if (job.id) { setJobId(job.id); setJobType("training") }
-    }).catch(() => {})
+
+    // Call the trainer
+    const callbackUrl = `${(import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/+$/, "")}/training/metrics-callback`
+    try {
+      await startTraining({
+        image_keys: imageKeys,
+        label_keys: [],
+        val_split: parseFloat(valSplit) || 0.2,
+        num_epochs: parseInt(epochs) || 10,
+        batch_size: parseInt(batchSize) || 8,
+        lr: lrToFloat(learningRate),
+        momentum: parseFloat(momentum) || 0.9,
+        weight_decay: lrToFloat(weightDecay),
+        aux_loss_weight: parseFloat(auxLossWeight) || 1.0,
+        callback_url: callbackUrl,
+      })
+      showToast("Training started!", "info")
+    } catch {
+      showToast("Failed to start training. Using simulation.", "error")
+    }
   }
 
   function handlePauseResume() {
@@ -324,20 +361,7 @@ export default function TrainingConfig() {
                   </>
                 )}
                 <div className="relative bg-surface-container-low p-8 rounded-3xl">
-                  <div className="space-y-10">
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-end">
-                        <label className="font-headline font-semibold text-on-surface">Acceptance Criteria</label>
-                        <span className="text-tertiary font-headline font-bold text-base">{acceptanceCriteria}</span>
-                      </div>
-                      <GlassDropdown
-                        value={acceptanceCriteria}
-                        options={["60%", "70%", "75%", "80%", "85%", "90%", "95%"]}
-                        onChange={setAcceptanceCriteria}
-                        disabled={locked}
-                      />
-                    </div>
-
+                  <div className="space-y-10 max-h-[65vh] overflow-y-auto no-scrollbar pr-2">
                     <div className="space-y-4">
                       <div className="flex justify-between items-end">
                         <label className="font-headline font-semibold text-on-surface">Learning Rate</label>
@@ -361,6 +385,71 @@ export default function TrainingConfig() {
                         value={epochs}
                         options={["5", "10", "20", "30", "50", "100"]}
                         onChange={setEpochs}
+                        disabled={locked}
+                      />
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-end">
+                        <label className="font-headline font-semibold text-on-surface">Batch Size</label>
+                        <span className="text-tertiary font-headline font-bold text-base">{batchSize}</span>
+                      </div>
+                      <GlassDropdown
+                        value={batchSize}
+                        options={["2", "4", "8", "16", "32", "64"]}
+                        onChange={setBatchSize}
+                        disabled={locked}
+                      />
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-end">
+                        <label className="font-headline font-semibold text-on-surface">Validation Split</label>
+                        <span className="text-tertiary font-headline font-bold text-base">{(parseFloat(valSplit) * 100).toFixed(0)}%</span>
+                      </div>
+                      <GlassDropdown
+                        value={valSplit}
+                        options={["0.1", "0.15", "0.2", "0.25", "0.3"]}
+                        onChange={setValSplit}
+                        disabled={locked}
+                      />
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-end">
+                        <label className="font-headline font-semibold text-on-surface">Momentum</label>
+                        <span className="text-tertiary font-headline font-bold text-base">{momentum}</span>
+                      </div>
+                      <GlassDropdown
+                        value={momentum}
+                        options={["0.8", "0.85", "0.9", "0.95", "0.99"]}
+                        onChange={setMomentum}
+                        disabled={locked}
+                      />
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-end">
+                        <label className="font-headline font-semibold text-on-surface">Weight Decay</label>
+                        <span className="text-tertiary font-headline font-bold text-base">{weightDecay}</span>
+                      </div>
+                      <GlassDropdown
+                        value={weightDecay}
+                        options={["1e-3", "1e-4", "1e-5", "0"]}
+                        onChange={setWeightDecay}
+                        disabled={locked}
+                      />
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-end">
+                        <label className="font-headline font-semibold text-on-surface">Aux Loss Weight</label>
+                        <span className="text-tertiary font-headline font-bold text-base">{auxLossWeight}</span>
+                      </div>
+                      <GlassDropdown
+                        value={auxLossWeight}
+                        options={["0", "0.4", "0.5", "0.7", "1.0"]}
+                        onChange={setAuxLossWeight}
                         disabled={locked}
                       />
                     </div>
@@ -536,7 +625,7 @@ export default function TrainingConfig() {
                 <div className="bg-surface-container-low rounded-3xl p-8 ghost-border flex flex-col items-center">
                   <div className="flex items-center justify-between w-full mb-6">
                     <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-error" /> Loss
+                      <span className="w-2 h-2 rounded-full bg-error" /> Training Loss
                     </h3>
                     {latestMetric && (
                       <span className="font-mono text-xs text-error">{latestMetric.trainLoss.toFixed(3)}</span>
@@ -549,33 +638,22 @@ export default function TrainingConfig() {
                         <YAxis stroke="#40485d" tick={{ fill: "#a3aac4", fontSize: 10 }} />
                         <Tooltip
                           contentStyle={{ background: "#060e20", border: "1px solid #40485d", color: "#dee5ff", fontSize: 11, borderRadius: "12px" }}
-                          formatter={(value: any, name: any) => [Number(value).toFixed(4), name === "trainLoss" ? "Train Loss" : "Val Loss"]}
+                          formatter={(value: any, name: any) => [Number(value).toFixed(4), "Train Loss"]}
                         />
-                        <Line type="monotone" dataKey="trainLoss" stroke="#ff716c" strokeWidth={2} dot={false} name="trainLoss" />
-                        <Line type="monotone" dataKey="valLoss" stroke="#a68cff" strokeWidth={2} dot={false} name="valLoss" strokeDasharray="4 2" />
+                        <Line type="monotone" dataKey="trainLoss" stroke="#ff716c" strokeWidth={2} dot={false} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="flex items-center gap-4 mt-4">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-3 h-[2px] bg-error rounded" />
-                      <span className="text-[10px] text-on-surface-variant">Train</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-3 h-[2px] bg-secondary rounded" style={{ borderTop: "2px dashed #a68cff", height: 0 }} />
-                      <span className="text-[10px] text-on-surface-variant">Validation</span>
-                    </div>
-                  </div>
                 </div>
 
-                {/* Accuracy Chart */}
+                {/* Val mIoU Chart */}
                 <div className="bg-surface-container-low rounded-3xl p-8 ghost-border flex flex-col items-center">
                   <div className="flex items-center justify-between w-full mb-6">
                     <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-tertiary" /> Accuracy
+                      <span className="w-2 h-2 rounded-full bg-tertiary" /> Val mIoU
                     </h3>
                     {latestMetric && (
-                      <span className="font-mono text-xs text-tertiary">{(latestMetric.accuracy * 100).toFixed(1)}%</span>
+                      <span className="font-mono text-xs text-tertiary">{(latestMetric.valMiou * 100).toFixed(1)}%</span>
                     )}
                   </div>
                   <div className="w-full h-64">
@@ -585,11 +663,22 @@ export default function TrainingConfig() {
                         <YAxis stroke="#40485d" tick={{ fill: "#a3aac4", fontSize: 10 }} domain={[0, 1]} />
                         <Tooltip
                           contentStyle={{ background: "#060e20", border: "1px solid #40485d", color: "#dee5ff", fontSize: 11, borderRadius: "12px" }}
-                          formatter={(value: any) => [(Number(value) * 100).toFixed(2) + "%", "Accuracy"]}
+                          formatter={(value: any, name: any) => [(Number(value) * 100).toFixed(2) + "%", name === "valMiou" ? "Val mIoU" : "Best mIoU"]}
                         />
-                        <Line type="monotone" dataKey="accuracy" stroke="#81ecff" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="valMiou" stroke="#81ecff" strokeWidth={2} dot={false} name="valMiou" />
+                        <Line type="monotone" dataKey="bestMiou" stroke="#a68cff" strokeWidth={2} dot={false} name="bestMiou" strokeDasharray="4 2" />
                       </LineChart>
                     </ResponsiveContainer>
+                  </div>
+                  <div className="flex items-center gap-4 mt-4">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3 h-[2px] bg-tertiary rounded" />
+                      <span className="text-[10px] text-on-surface-variant">Val mIoU</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3 h-[2px] bg-secondary rounded" />
+                      <span className="text-[10px] text-on-surface-variant">Best mIoU</span>
+                    </div>
                   </div>
                 </div>
               </div>

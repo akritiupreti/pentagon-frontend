@@ -192,10 +192,31 @@ export async function suggestHyperparameters(imageCount: number, classes: string
     return res.json()
 }
 
-const INFERENCE_ENDPOINT = "http://3.110.37.205:8000/segment-dataset" // TODO: replace with actual endpoint
+const INFERENCE_ENDPOINT = "http://3.110.37.205:8000/segment-dataset"
+const TRAINING_ENDPOINT = "http://3.110.37.205:8000/train"
 
 export async function startInferencing(payload: { keys: string[]; modelType: string; userId: string; sessionId: string }) {
     const res = await fetch(INFERENCE_ENDPOINT, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify(payload),
+    })
+    return res.json()
+}
+
+export async function startTraining(payload: {
+    image_keys: string[];
+    label_keys: string[];
+    val_split: number;
+    num_epochs: number;
+    batch_size: number;
+    lr: number;
+    momentum: number;
+    weight_decay: number;
+    aux_loss_weight: number;
+    callback_url: string;
+}) {
+    const res = await fetch(TRAINING_ENDPOINT, {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify(payload),
