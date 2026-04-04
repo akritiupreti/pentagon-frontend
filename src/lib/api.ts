@@ -192,9 +192,9 @@ export async function suggestHyperparameters(imageCount: number, classes: string
     return res.json()
 }
 
-const INFERENCE_ENDPOINT = "http://localhost:8000/inference/start" // TODO: replace with actual endpoint
+const INFERENCE_ENDPOINT = "http://3.110.37.205:8000/segment-dataset" // TODO: replace with actual endpoint
 
-export async function startInferencing(payload: { urls: string[]; modelType: string; userId: string; sessionId: string }) {
+export async function startInferencing(payload: { keys: string[]; modelType: string; userId: string; sessionId: string }) {
     const res = await fetch(INFERENCE_ENDPOINT, {
         method: "POST",
         headers: authHeaders(),
@@ -214,6 +214,13 @@ export async function createJob(sessionId: string, jobType: "training" | "infere
 
 export async function getJob(jobId: string) {
     const res = await fetch(`${BASE_URL}/jobs/${jobId}`, {
+        headers: authHeaders(),
+    })
+    return res.json()
+}
+
+export async function getLatestMetric(jobId: string) {
+    const res = await fetch(`${BASE_URL}/jobs/${jobId}/metrics/latest`, {
         headers: authHeaders(),
     })
     return res.json()

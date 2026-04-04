@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { createSession, uploadDataset, suggestHyperparameters, startInferencing, createJob, getJob } from "../lib/api"
+import { createSession, uploadDataset, suggestHyperparameters, startInferencing, createJob, getJob, getLatestMetric } from "../lib/api"
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import Navbar from "../components/Navbar"
 import GlassDropdown from "../components/GlassDropdown"
@@ -27,6 +27,7 @@ export default function TrainingConfig() {
   const [toastMsg, setToastMsg] = useState<{ text: string; type: "success" | "info" | "error" } | null>(null)
   const [isInferencing, setIsInferencing] = useState(false)
   const [jobId, setJobId] = useState<string | null>(null)
+  const [jobType, setJobType] = useState<"training" | "inferencing" | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const initRan = useRef(false)
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -107,12 +108,33 @@ export default function TrainingConfig() {
     }
   }
 
-  // Long-poll job status
+  // Long-poll job status (+ metrics for training only)
   useEffect(() => {
     if (!jobId) return
     pollRef.current = setInterval(async () => {
       try {
         const job = await getJob(jobId)
+
+        // Fetch metrics only for training jobs
+        if (jobType === "training") {
+          const metric = await getLatestMetric(jobId)
+          if (metric?.data) {
+            const d = metric.data
+            const epoch = d.epoch ?? 0
+            const totalEpochs = parseInt(epochs) || 10
+            setProgress(Math.min((epoch / totalEpochs) * 100, 99.9))
+            setMetrics((prev) => {
+              if (prev.length > 0 && prev[prev.length - 1].step === epoch) return prev
+              return [...prev, {
+                step: epoch,
+                trainLoss: d.training_loss ?? d.trainLoss ?? 0,
+                valLoss: d.validation_loss ?? d.valLoss ?? 0,
+                accuracy: d.validation_accuracy ?? d.accuracy ?? 0,
+              }]
+            })
+          }
+        }
+
         if (job.is_completed) {
           clearInterval(pollRef.current!)
           pollRef.current = null
@@ -121,11 +143,12 @@ export default function TrainingConfig() {
           setProgress(100)
           showToast(`${job.job_type === "training" ? "Training" : "Inferencing"} complete!`, "success")
           setJobId(null)
+          setJobType(null)
         }
       } catch {}
     }, 3000)
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
-  }, [jobId])
+  }, [jobId, jobType])
 
   function getUserId(): string {
     const token = localStorage.getItem("token")
@@ -137,18 +160,18 @@ export default function TrainingConfig() {
   }
 
   async function handleInferencing() {
-    const storedUrls = localStorage.getItem("datasetUrls")
-    const urls: string[] = storedUrls ? JSON.parse(storedUrls) : []
-    if (urls.length === 0) { showToast("No dataset URLs found. Upload a dataset first.", "error"); return }
+    const storedKeys = localStorage.getItem("datasetKeys")
+    const keys: string[] = storedKeys ? JSON.parse(storedKeys) : []
+    if (keys.length === 0) { showToast("No dataset found. Upload a dataset first.", "error"); return }
     if (!sessionId) { showToast("No session found.", "error"); return }
     setIsInferencing(true)
     try {
       // Create job record
       const job = await createJob(sessionId, "inferencing")
-      if (job.id) setJobId(job.id)
+      if (job.id) { setJobId(job.id); setJobType("inferencing") }
       // Fire off inferencing request
       await startInferencing({
-        urls,
+        keys,
         modelType: type === "medical" ? "medical" : "realtime",
         userId: getUserId(),
         sessionId,
@@ -160,6 +183,27 @@ export default function TrainingConfig() {
     }
   }
 
+  function handleStopInferencing() {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+    setIsInferencing(false)
+    setJobId(null)
+    setJobType(null)
+    showToast("Inferencing stopped.", "info")
+  }
+
+  function handleStopTraining() {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+    if (progressRef.current) { clearInterval(progressRef.current); progressRef.current = null }
+    setIsTraining(false)
+    setIsPaused(false)
+    setProgress(0)
+    setMetrics([])
+    setJobId(null)
+    setJobType(null)
+    stepRef.current = 0
+    showToast("Training stopped.", "info")
+  }
+
   function handleStart() {
     if (!sessionId) { showToast("No session found.", "error"); return }
     setIsTraining(true)
@@ -169,7 +213,7 @@ export default function TrainingConfig() {
     stepRef.current = 0
     // Create job record
     createJob(sessionId, "training").then((job) => {
-      if (job.id) setJobId(job.id)
+      if (job.id) { setJobId(job.id); setJobType("training") }
     }).catch(() => {})
   }
 
@@ -227,7 +271,7 @@ export default function TrainingConfig() {
             <div className="relative">
               {/* Hyperparameters - centered */}
               <div className="max-w-2xl mx-auto relative">
-                {(isTraining && !isPaused) && (
+                {((isTraining && !isPaused) || isInferencing) && (
                   <>
                     <span className="absolute -inset-[3px] rounded-3xl rainbow-border-glow" />
                     <span className="absolute -inset-[1px] rounded-3xl rainbow-border-lg" />
@@ -316,61 +360,61 @@ export default function TrainingConfig() {
 
                   {/* Actions */}
                   <div className="mt-8 flex flex-col items-center gap-4 pt-6 border-t border-outline-variant/10">
-                    {!isTraining && progress < 100 && (
-                      <div className="flex gap-3 w-full max-w-lg">
-                        <button
-                          onClick={handleInferencing}
-                          disabled={isInferencing}
-                          className="flex-1 py-4 px-6 liquid-glass text-on-surface font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                        >
-                          {isInferencing ? "Starting..." : "Start Inferencing"}
-                          <span className="material-symbols-outlined text-sm">play_circle</span>
-                        </button>
-                        <button
-                          onClick={handleStart}
-                          className="flex-1 py-4 px-6 liquid-glass-primary-solid text-on-primary font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                        >
-                          Start Training
-                          <span className="material-symbols-outlined text-sm">rocket_launch</span>
-                        </button>
-                      </div>
-                    )}
-
-                    {isTraining && (
+                    <div className={`flex gap-3 w-full max-w-lg transition-all duration-300 ${!isTraining && !isInferencing && progress < 100 ? "opacity-100 scale-100" : "opacity-0 scale-95 h-0 overflow-hidden"}`}>
                       <button
-                        onClick={handlePauseResume}
-                        className={`w-full max-w-xs py-4 rounded-full font-bold text-sm uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2 ${
-                          isPaused
-                            ? "liquid-glass-primary-solid text-on-primary"
-                            : "liquid-glass-error text-on-surface"
-                        }`}
+                        onClick={handleInferencing}
+                        className="flex-1 py-4 px-6 liquid-glass text-on-surface font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                       >
-                        {isPaused ? (
-                          <>Resume Training<span className="material-symbols-outlined text-sm">play_arrow</span></>
-                        ) : (
-                          <>Pause Training<span className="material-symbols-outlined text-sm">pause</span></>
-                        )}
+                        Start Inferencing
+                        <span className="material-symbols-outlined text-sm">play_circle</span>
                       </button>
-                    )}
+                      <button
+                        onClick={handleStart}
+                        className="flex-1 py-4 px-6 liquid-glass-primary-solid text-on-primary font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                      >
+                        Start Training
+                        <span className="material-symbols-outlined text-sm">rocket_launch</span>
+                      </button>
+                    </div>
 
-                    {!isTraining && progress >= 100 && (
+                    <div className={`w-full max-w-xs transition-all duration-300 ${isInferencing ? "opacity-100 scale-100" : "opacity-0 scale-95 h-0 overflow-hidden"}`}>
+                      <button
+                        onClick={handleStopInferencing}
+                        className="w-full py-4 liquid-glass-error text-on-surface font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                      >
+                        Stop Inferencing
+                        <span className="material-symbols-outlined text-sm">stop_circle</span>
+                      </button>
+                    </div>
+
+                    <div className={`w-full max-w-xs transition-all duration-300 ${isTraining ? "opacity-100 scale-100" : "opacity-0 scale-95 h-0 overflow-hidden"}`}>
+                      <button
+                        onClick={handleStopTraining}
+                        className="w-full py-4 liquid-glass-error text-on-surface font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                      >
+                        Stop Training
+                        <span className="material-symbols-outlined text-sm">stop_circle</span>
+                      </button>
+                    </div>
+
+                    <div className={`w-full max-w-xs transition-all duration-300 ${!isTraining && !isInferencing && progress >= 100 ? "opacity-100 scale-100" : "opacity-0 scale-95 h-0 overflow-hidden"}`}>
                       <button
                         onClick={() => navigate("/dashboard")}
-                        className="w-full max-w-xs py-4 liquid-glass-primary-solid text-on-primary font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                        className="w-full py-4 liquid-glass-primary-solid text-on-primary font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                       >
                         Go to Dashboard
                         <span className="material-symbols-outlined text-sm">arrow_forward</span>
                       </button>
-                    )}
+                    </div>
 
-                    {!isTraining && progress < 100 && (
+                    <div className={`transition-all duration-300 ${!isTraining && !isInferencing && progress < 100 ? "opacity-100" : "opacity-0 h-0 overflow-hidden"}`}>
                       <button
                         onClick={() => navigate("/setup")}
                         className="text-on-surface-variant text-sm hover:text-primary transition-colors"
                       >
                         Back
                       </button>
-                    )}
+                    </div>
                   </div>
                 </div>
               </div>
