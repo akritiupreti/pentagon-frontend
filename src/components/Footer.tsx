@@ -8,7 +8,7 @@ export default function Footer() {
           </a>
         ))}
       </div>
-      <div className="text-slate-400 font-body text-xs uppercase tracking-widest">© 2025 FusionAI</div>
+      <div className="text-slate-400 font-body text-xs uppercase tracking-widest">© 2026 Pentagon · FusionAI</div>
     </footer>
   )
 }
