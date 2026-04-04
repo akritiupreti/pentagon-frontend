@@ -198,7 +198,7 @@ const TRAINING_ENDPOINT = "https://d1g2tfsba2s4qj.cloudfront.net/train"
 export async function startInferencing(payload: { keys: string[]; modelType: string; userId: string; sessionId: string }) {
     const res = await fetch(INFERENCE_ENDPOINT, {
         method: "POST",
-        headers: authHeaders(),
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
     })
     return res.json()
@@ -218,7 +218,7 @@ export async function startTraining(payload: {
 }) {
     const res = await fetch(TRAINING_ENDPOINT, {
         method: "POST",
-        headers: authHeaders(),
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
     })
     return res.json()
