@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:8000"
+const BASE_URL = "https://d3u251r4o065ue.cloudfront.net"
 
 function getToken() {
     if (typeof window === "undefined") return null
