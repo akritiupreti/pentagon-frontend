@@ -77,7 +77,7 @@ export default function Navbar() {
             </button>
 
             {showProfile && (
-              <div className="absolute right-0 top-12 w-72 glass-panel rounded-2xl border border-outline-variant/15 shadow-[0_24px_48px_rgba(0,0,0,0.5)] overflow-hidden animate-[profileReveal_0.2s_ease-out]">
+              <div className="absolute right-0 top-12 w-72 rounded-2xl border border-outline-variant/15 shadow-[0_24px_48px_rgba(0,0,0,0.5)] overflow-hidden animate-[profileReveal_0.2s_ease-out] bg-surface-container">
                 <div className="p-5">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
