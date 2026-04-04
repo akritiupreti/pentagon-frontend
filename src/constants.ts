@@ -125,7 +125,6 @@ export const pillPanel: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 8,
-  flexWrap: "wrap",
   justifyContent: "center",
   background: "rgba(255,255,255,0.88)",
   backdropFilter: "blur(14px)",

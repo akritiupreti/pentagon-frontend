@@ -1,5 +1,6 @@
 import UPNG from "upng-js";
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { ImageState, ViewTransform } from "@/lib/types";
 import { imageStore } from "./ImageStore";
@@ -113,6 +114,7 @@ const fitTransform = (
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 const App = () => {
+  const navigate = useNavigate();
   const [vpW, setVpW] = useState(window.innerWidth);
   const [vpH, setVpH] = useState(window.innerHeight);
 
@@ -663,6 +665,18 @@ const App = () => {
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
       />
+
+      {/* ── Back button ── */}
+      <button
+        onClick={() => navigate("/setup")}
+        className="g-btn g-btn-nav"
+        style={{ position: "absolute", top: 16, left: 16, zIndex: 10 }}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+        </svg>
+        Back
+      </button>
 
       {/* ── Toolbar ── */}
       <div style={{ ...pillPanel, top: 16 }}>

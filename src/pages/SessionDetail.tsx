@@ -102,7 +102,7 @@ export default function SessionDetail() {
                   <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface mb-1">
                     {session.name}
                   </h1>
-                  <p className="text-on-surface-variant text-sm">{session.architecture} · {session.task === "realtime" ? "Real Time" : session.task === "medical" ? "Medical" : session.task.charAt(0).toUpperCase() + session.task.slice(1)}</p>
+                  <p className="text-on-surface-variant text-sm">{session.architecture} · {session.task === "realtime" ? "Real Time" : session.task === "medical" ? "Medical" : (session.task as string).charAt(0).toUpperCase() + (session.task as string).slice(1)}</p>
                 </div>
                 <button
                   onClick={() => {
