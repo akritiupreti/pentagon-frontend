@@ -66,7 +66,17 @@ export default function Navbar() {
           </div>
         )}
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-6">
+        <Link
+          to="/pricing"
+          className={`hidden md:block transition-colors scale-95 active:duration-100 ${
+            isActive("/pricing")
+              ? "text-blue-400 border-b-2 border-blue-500 pb-1"
+              : "text-slate-400 hover:text-blue-300"
+          }`}
+        >
+          Pricing
+        </Link>
         {token ? (
           <div ref={profileRef} className="relative">
             <button

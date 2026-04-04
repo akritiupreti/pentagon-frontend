@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { imageStore } from "./ImageStore"
-import { getSessions, deleteSession, getPresignedUrls, uploadFileToS3 } from "../lib/api"
+import { getSessions, deleteSession, getPresignedUrls, uploadFileToS3, getMe } from "../lib/api"
 import { Session } from "../lib/types"
 import Navbar from "../components/Navbar"
 
@@ -42,6 +42,7 @@ export default function SetupWizard() {
   const [uploading, setUploading] = useState(false)
   const [uploadToast, setUploadToast] = useState<{ text: string; type: "success" | "error" } | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [permissions, setPermissions] = useState<string[]>([])
 
   const stepIndex = STEPS.indexOf(step)
   const viewIndex = STEPS.indexOf(activeView)
@@ -65,7 +66,10 @@ export default function SetupWizard() {
 
   useEffect(() => {
     const token = localStorage.getItem("token")
-    if (!token) navigate("/login")
+    if (!token) { navigate("/login"); return }
+    getMe().then((data) => {
+      if (data.permissions) setPermissions(data.permissions)
+    }).catch(() => {})
   }, [navigate])
 
   function goTo(next: Step) {
@@ -182,21 +186,24 @@ export default function SetupWizard() {
     setSelected((prev) => prev.includes(cls) ? prev.filter((c) => c !== cls) : [...prev, cls])
   }
 
+  const canTrain = permissions.some((p) => p === "TRAIN" || p === "TRAIN_LABEL")
+  const canLabel = permissions.some((p) => p === "LABEL" || p === "TRAIN_LABEL")
+
   const stepContent: Record<Step, React.ReactNode> = {
     mode: (
       <div className="bg-surface-container-low rounded-3xl p-10 ghost-border">
         <h2 className="text-3xl font-extrabold font-headline tracking-tight mb-2">What would you like to do?</h2>
         <p className="text-on-surface-variant text-sm mb-8">Choose your workflow to get started</p>
         <div className="grid grid-cols-2 gap-4">
-          <button onClick={() => handleModeSelect("train")} className={`p-8 rounded-2xl text-left transition-all duration-300 ${mode === "train" ? "liquid-glass-primary border-primary/30" : "liquid-glass"}`}>
+          <button onClick={() => handleModeSelect("train")} disabled={!canTrain} className={`p-8 rounded-2xl text-left transition-all duration-300 ${!canTrain ? "opacity-40 cursor-not-allowed" : mode === "train" ? "liquid-glass-primary border-primary/30" : "liquid-glass"}`}>
             <span className="material-symbols-outlined text-3xl text-primary mb-4 block">model_training</span>
             <div className="font-headline font-bold text-xl mb-1">Train</div>
-            <p className="text-on-surface-variant text-xs">Train a segmentation model with your dataset</p>
+            <p className="text-on-surface-variant text-xs">{canTrain ? "Train a segmentation model with your dataset" : "Upgrade your plan to access training"}</p>
           </button>
-          <button onClick={() => handleModeSelect("label")} className={`p-8 rounded-2xl text-left transition-all duration-300 ${mode === "label" ? "liquid-glass-primary border-primary/30" : "liquid-glass"}`}>
+          <button onClick={() => handleModeSelect("label")} disabled={!canLabel} className={`p-8 rounded-2xl text-left transition-all duration-300 ${!canLabel ? "opacity-40 cursor-not-allowed" : mode === "label" ? "liquid-glass-primary border-primary/30" : "liquid-glass"}`}>
             <span className="material-symbols-outlined text-3xl text-secondary mb-4 block">label</span>
             <div className="font-headline font-bold text-xl mb-1">Label</div>
-            <p className="text-on-surface-variant text-xs">Annotate images for training data</p>
+            <p className="text-on-surface-variant text-xs">{canLabel ? "Annotate images for training data" : "Upgrade your plan to access labeling"}</p>
           </button>
         </div>
       </div>

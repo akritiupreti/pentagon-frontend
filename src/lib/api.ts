@@ -48,6 +48,13 @@ export async function resendCode(email: string) {
     return res.json()
 }
 
+export async function getMe() {
+    const res = await fetch(`${BASE_URL}/auth/me`, {
+        headers: authHeaders(),
+    })
+    return res.json()
+}
+
 export async function getSessions() {
     const res = await fetch(`${BASE_URL}/sessions`, {
         headers: authHeaders(),

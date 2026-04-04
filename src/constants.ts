@@ -135,3 +135,10 @@ export const pillPanel: React.CSSProperties = {
   zIndex: 10,
   whiteSpace: "nowrap",
 };
+
+// src/lib/constants.ts
+export enum Permission {
+  TRAIN = "TRAIN",
+  LABEL = "LABEL",
+  TRAIN_LABEL = "TRAIN_LABEL",
+}
