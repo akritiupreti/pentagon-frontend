@@ -192,8 +192,8 @@ export async function suggestHyperparameters(imageCount: number, classes: string
     return res.json()
 }
 
-const INFERENCE_ENDPOINT = "http://3.110.37.205:8000/segment-dataset"
-const TRAINING_ENDPOINT = "http://3.110.37.205:8000/train"
+const INFERENCE_ENDPOINT = "https://d1g2tfsba2s4qj.cloudfront.net/segment-dataset"
+const TRAINING_ENDPOINT = "https://d1g2tfsba2s4qj.cloudfront.net/train"
 
 export async function startInferencing(payload: { keys: string[]; modelType: string; userId: string; sessionId: string }) {
     const res = await fetch(INFERENCE_ENDPOINT, {
