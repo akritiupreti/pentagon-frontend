@@ -788,7 +788,7 @@ const App = () => {
 
       {/* ── Navigation ── */}
       {totalImages > 0 && (
-        <div style={{ ...pillPanel, bottom: 20 }}>
+        <div style={{ ...pillPanel, padding: "6px 14px", bottom: 20, minWidth: 400, maxWidth: 540, width: "100%", justifyContent: "space-between" }}>
           <button
             onClick={goPrev}
             disabled={currentIndex === 0}
@@ -805,22 +805,21 @@ const App = () => {
               fontSize: 13,
               color: "#3c4043",
               fontFamily: "'Google Sans','Roboto',sans-serif",
-              textAlign: "center",
-              minWidth: 160,
-              lineHeight: 1.6,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              whiteSpace: "nowrap",
             }}
           >
-            <span style={{ fontWeight: 500, color: "#202124" }}>
+            <span style={{ fontWeight: 500, color: "#202124", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis" }}>
               {files[currentIndex]?.name ?? ""}
             </span>
-            <br />
             <span style={{ color: "#5f6368" }}>
-              {currentIndex + 1} / {totalImages}
+              ({currentIndex + 1}/{totalImages})
             </span>
             {annotatedCount > 0 && (
               <span
                 style={{
-                  marginLeft: 8,
                   background: "#e8f0fe",
                   color: "#1a73e8",
                   borderRadius: 10,
@@ -872,8 +871,8 @@ const App = () => {
         style={{
           ...pillPanel,
           left: "8%",
-          gap: "0px",
-          padding: "3px 0 px",
+          gap: "4px",
+          padding: "6px 14px",
           bottom: 20,
         }}
       >
@@ -881,7 +880,7 @@ const App = () => {
           onClick={zoomOut}
           disabled={!hasImage}
           className="g-btn g-btn-outlined"
-          style={{ padding: "0 12px" }}
+          style={{ padding: "0 16px", height: 36 }}
         >
           {ZoomOut()}
         </button>
@@ -892,7 +891,7 @@ const App = () => {
           onClick={zoomIn}
           disabled={!hasImage}
           className="g-btn g-btn-outlined"
-          style={{ padding: "0 12px" }}
+          style={{ padding: "0 16px", height: 36 }}
         >
           {ZoomIn()}
         </button>
@@ -901,7 +900,7 @@ const App = () => {
           onClick={zoomReset}
           disabled={!hasImage}
           className="g-btn g-btn-outlined"
-          style={{ fontSize: 11 }}
+          style={{ fontSize: 11, height: 36 }}
         >
           Fit
         </button>
