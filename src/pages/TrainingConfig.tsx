@@ -28,6 +28,7 @@ export default function TrainingConfig() {
   const [isInferencing, setIsInferencing] = useState(false)
   const [jobId, setJobId] = useState<string | null>(null)
   const [jobType, setJobType] = useState<"training" | "inferencing" | null>(null)
+  const [isStopped, setIsStopped] = useState<"training" | "inferencing" | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const initRan = useRef(false)
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -188,6 +189,7 @@ export default function TrainingConfig() {
     setIsInferencing(false)
     setJobId(null)
     setJobType(null)
+    setIsStopped("inferencing")
     showToast("Inferencing stopped.", "info")
   }
 
@@ -196,12 +198,26 @@ export default function TrainingConfig() {
     if (progressRef.current) { clearInterval(progressRef.current); progressRef.current = null }
     setIsTraining(false)
     setIsPaused(false)
-    setProgress(0)
-    setMetrics([])
     setJobId(null)
     setJobType(null)
-    stepRef.current = 0
+    setIsStopped("training")
     showToast("Training stopped.", "info")
+  }
+
+  function handleResumeTraining() {
+    if (!sessionId) { showToast("No session found.", "error"); return }
+    setIsStopped(null)
+    setIsTraining(true)
+    createJob(sessionId, "training").then((job) => {
+      if (job.id) { setJobId(job.id); setJobType("training") }
+    }).catch(() => {})
+  }
+
+  function handleRunAgain() {
+    setIsStopped(null)
+    setProgress(0)
+    setMetrics([])
+    stepRef.current = 0
   }
 
   function handleStart() {
@@ -359,8 +375,9 @@ export default function TrainingConfig() {
                   )}
 
                   {/* Actions */}
-                  <div className="mt-8 flex flex-col items-center gap-4 pt-6 border-t border-outline-variant/10">
-                    <div className={`flex gap-3 w-full max-w-lg transition-all duration-300 ${!isTraining && !isInferencing && progress < 100 ? "opacity-100 scale-100" : "opacity-0 scale-95 h-0 overflow-hidden"}`}>
+                  <div className="mt-8 flex flex-col items-center gap-2 pt-6 border-t border-outline-variant/10">
+                    {/* Idle: both buttons */}
+                    <div className={`flex gap-3 w-full max-w-lg transition-all duration-300 ${!isTraining && !isInferencing && !isStopped && progress < 100 ? "opacity-100 scale-100" : "opacity-0 scale-95 h-0 overflow-hidden"}`}>
                       <button
                         onClick={handleInferencing}
                         className="flex-1 py-4 px-6 liquid-glass text-on-surface font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
@@ -377,6 +394,7 @@ export default function TrainingConfig() {
                       </button>
                     </div>
 
+                    {/* Running inferencing: stop button */}
                     <div className={`w-full max-w-xs transition-all duration-300 ${isInferencing ? "opacity-100 scale-100" : "opacity-0 scale-95 h-0 overflow-hidden"}`}>
                       <button
                         onClick={handleStopInferencing}
@@ -387,6 +405,7 @@ export default function TrainingConfig() {
                       </button>
                     </div>
 
+                    {/* Running training: stop button */}
                     <div className={`w-full max-w-xs transition-all duration-300 ${isTraining ? "opacity-100 scale-100" : "opacity-0 scale-95 h-0 overflow-hidden"}`}>
                       <button
                         onClick={handleStopTraining}
@@ -397,17 +416,55 @@ export default function TrainingConfig() {
                       </button>
                     </div>
 
-                    <div className={`w-full max-w-xs transition-all duration-300 ${!isTraining && !isInferencing && progress >= 100 ? "opacity-100 scale-100" : "opacity-0 scale-95 h-0 overflow-hidden"}`}>
+                    {/* Stopped training: resume + run again */}
+                    <div className={`flex flex-col items-center gap-6 w-full max-w-xs transition-all duration-300 ${isStopped === "training" ? "opacity-100 scale-100" : "opacity-0 scale-95 h-0 overflow-hidden p-0 m-0"}`}>
+                      <button
+                        onClick={handleResumeTraining}
+                        className="w-full py-4 liquid-glass-primary-solid text-on-primary font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                      >
+                        Resume Training
+                        <span className="material-symbols-outlined text-sm">play_arrow</span>
+                      </button>
+                      <button
+                        onClick={handleRunAgain}
+                        className="w-full py-4 liquid-glass text-on-surface font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                      >
+                        Run Again
+                        <span className="material-symbols-outlined text-sm">replay</span>
+                      </button>
+                    </div>
+
+                    {/* Stopped inferencing: run again only */}
+                    <div className={`flex flex-col items-center gap-3 w-full max-w-xs transition-all duration-300 ${isStopped === "inferencing" ? "opacity-100 scale-100" : "opacity-0 scale-95 h-0 overflow-hidden"}`}>
+                      <button
+                        onClick={handleRunAgain}
+                        className="w-full py-4 liquid-glass text-on-surface font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                      >
+                        Run Again
+                        <span className="material-symbols-outlined text-sm">replay</span>
+                      </button>
+                    </div>
+
+                    {/* Completed: run again + dashboard */}
+                    <div className={`flex gap-3 w-full max-w-lg transition-all duration-300 ${!isTraining && !isInferencing && !isStopped && progress >= 100 ? "opacity-100 scale-100" : "opacity-0 scale-95 h-0 overflow-hidden"}`}>
+                      <button
+                        onClick={() => { setProgress(0); setMetrics([]); stepRef.current = 0 }}
+                        className="flex-1 py-4 px-6 liquid-glass text-on-surface font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                      >
+                        Run Again
+                        <span className="material-symbols-outlined text-sm">replay</span>
+                      </button>
                       <button
                         onClick={() => navigate("/dashboard")}
-                        className="w-full py-4 liquid-glass-primary-solid text-on-primary font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                        className="flex-1 py-4 px-6 liquid-glass-primary-solid text-on-primary font-bold text-sm uppercase tracking-widest rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                       >
                         Go to Dashboard
                         <span className="material-symbols-outlined text-sm">arrow_forward</span>
                       </button>
                     </div>
 
-                    <div className={`transition-all duration-300 ${!isTraining && !isInferencing && progress < 100 ? "opacity-100" : "opacity-0 h-0 overflow-hidden"}`}>
+                    {/* Back link: only in idle */}
+                    <div className={`transition-all duration-300 ${!isTraining && !isInferencing && !isStopped && progress < 100 ? "opacity-100" : "opacity-0 h-0 overflow-hidden"}`}>
                       <button
                         onClick={() => navigate("/setup")}
                         className="text-on-surface-variant text-sm hover:text-primary transition-colors"
