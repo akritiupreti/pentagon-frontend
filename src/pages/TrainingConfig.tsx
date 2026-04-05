@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { createSession, uploadDataset, suggestHyperparameters, startInferencing, startTraining, createJob, getJob, getLatestMetric, bootstrapSession, getEpochMetrics } from "../lib/api"
+import { createSession, uploadDataset, suggestHyperparameters, startInferencing, startTraining, createJob, getJob, getLatestMetric, bootstrapSession, getEpochMetrics, getMaskDownloadUrls } from "../lib/api"
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import Navbar from "../components/Navbar"
 import GlassDropdown from "../components/GlassDropdown"
@@ -33,6 +33,8 @@ export default function TrainingConfig() {
   const [jobId, setJobId] = useState<string | null>(null)
   const [jobType, setJobType] = useState<"training" | "inferencing" | null>(null)
   const [isStopped, setIsStopped] = useState<"training" | "inferencing" | null>(null)
+  const [inferenceComplete, setInferenceComplete] = useState(false)
+  const [downloadingMasks, setDownloadingMasks] = useState(false)
   const [runId, setRunId] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const initRan = useRef(false)
@@ -165,6 +167,7 @@ export default function TrainingConfig() {
         if (job.is_completed) {
           clearInterval(pollRef.current!)
           pollRef.current = null
+          if (job.job_type === "inferencing") setInferenceComplete(true)
           setIsTraining(false)
           setIsInferencing(false)
           setProgress(100)
@@ -203,6 +206,8 @@ export default function TrainingConfig() {
         modelType: type === "medical" ? "medical" : "realtime",
         userId: getUserId(),
         sessionId,
+        job_id: job?.id || null,
+        callback_url: (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/+$/, ""),
       })
       showToast("Inferencing started! Polling for completion...", "info")
     } catch {
@@ -248,9 +253,35 @@ export default function TrainingConfig() {
 
   function handleRunAgain() {
     setIsStopped(null)
+    setInferenceComplete(false)
+    setDownloadingMasks(false)
     setProgress(0)
     setMetrics([])
     stepRef.current = 0
+  }
+
+  async function handleDownloadMasks() {
+    if (!sessionId) return
+    setDownloadingMasks(true)
+    try {
+      const res = await getMaskDownloadUrls(sessionId)
+      if (res.urls && res.urls.length > 0) {
+        for (const { url, filename } of res.urls) {
+          const a = document.createElement("a")
+          a.href = url
+          a.download = filename
+          a.target = "_blank"
+          a.click()
+        }
+        showToast(`Downloading ${res.urls.length} mask(s)`, "success")
+      } else {
+        showToast("No masks found.", "error")
+      }
+    } catch {
+      showToast("Failed to download masks.", "error")
+    } finally {
+      setDownloadingMasks(false)
+    }
   }
 
   function lrToFloat(lr: string): number {
@@ -293,6 +324,7 @@ export default function TrainingConfig() {
         weight_decay: lrToFloat(weightDecay),
         aux_loss_weight: parseFloat(auxLossWeight) || 1.0,
         callback_url: callbackUrl,
+        job_id: job?.id || null,
       })
       showToast("Training started!", "info")
     } catch {
@@ -486,10 +518,22 @@ export default function TrainingConfig() {
                   )}
 
                   {/* Completed state */}
-                  {!isTraining && progress >= 100 && (
-                    <div className="mt-8 p-4 rounded-2xl bg-tertiary/10 border border-tertiary/20 flex items-center gap-3">
-                      <span className="material-symbols-outlined text-tertiary">check_circle</span>
-                      <span className="text-sm font-semibold text-tertiary">Training complete!</span>
+                  {!isTraining && !isInferencing && progress >= 100 && (
+                    <div className="mt-8 p-4 rounded-2xl bg-tertiary/10 border border-tertiary/20 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-tertiary">check_circle</span>
+                        <span className="text-sm font-semibold text-tertiary">{inferenceComplete ? "Inferencing complete!" : "Training complete!"}</span>
+                      </div>
+                      {inferenceComplete && (
+                        <button
+                          onClick={handleDownloadMasks}
+                          disabled={downloadingMasks}
+                          className="px-5 py-2 rounded-full liquid-glass-primary text-on-surface text-xs font-bold uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2 disabled:opacity-50"
+                        >
+                          <span className="material-symbols-outlined text-sm">download</span>
+                          {downloadingMasks ? "Downloading..." : "Download Masks"}
+                        </button>
+                      )}
                     </div>
                   )}
 

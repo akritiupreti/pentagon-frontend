@@ -179,6 +179,15 @@ export async function downloadModel(sessionId: string) {
     window.URL.revokeObjectURL(url)
 }
 
+export async function getMaskDownloadUrls(sessionId: string) {
+    const res = await fetch(`${BASE_URL}/sessions/download-masks`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ session_id: sessionId }),
+    })
+    return res.json()
+}
+
 export async function suggestHyperparameters(imageCount: number, classes: string[]) {
     const res = await fetch(`${BASE_URL}/sessions/suggest-hyperparameters`, {
         method: "POST",
@@ -192,10 +201,10 @@ export async function suggestHyperparameters(imageCount: number, classes: string
     return res.json()
 }
 
-const INFERENCE_ENDPOINT = "http://3.110.37.205:8000/segment-dataset"
-const TRAINING_ENDPOINT = "http://3.110.37.205:8000/train"
+const INFERENCE_ENDPOINT = "http://13.235.83.45:8000/segment-dataset"
+const TRAINING_ENDPOINT = "http://13.235.83.45:8000/train"
 
-export async function startInferencing(payload: { keys: string[]; modelType: string; userId: string; sessionId: string }) {
+export async function startInferencing(payload: { keys: string[]; modelType: string; userId: string; sessionId: string; job_id: string | null; callback_url: string }) {
     const res = await fetch(INFERENCE_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -215,6 +224,7 @@ export async function startTraining(payload: {
     weight_decay: number;
     aux_loss_weight: number;
     callback_url: string;
+    job_id: string | null;
 }) {
     const res = await fetch(TRAINING_ENDPOINT, {
         method: "POST",
