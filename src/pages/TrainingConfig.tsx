@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { createSession, uploadDataset, suggestHyperparameters, startInferencing, startTraining, createJob, getJob, getLatestMetric, bootstrapSession, getEpochMetrics, getMaskDownloadUrls } from "../lib/api"
+import { createSession, uploadDataset, suggestHyperparameters, startInferencing, startTraining, createJob, getJob, getLatestMetric, bootstrapSession, getEpochMetrics, getMaskDownloadUrls, getDemoProposal, getDemoOrchestratorLog, getDemoTrainingReport } from "../lib/api"
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import Navbar from "../components/Navbar"
 import GlassDropdown from "../components/GlassDropdown"
 
 type MetricPoint = { step: number; trainLoss: number; valMiou: number; bestMiou: number }
+type Proposal = { proposal_id: string; status: string; proposed_params: Record<string, string>; rationale: string; overfitting_severity: string; trend: string; confidence: string; source_epoch: number }
+type OrchestratorLog = { id: string; epoch: number; decision: string; agents_called: string[]; rationale: string; duration_ms: number; created_at: string }
+type TrainingReport = { total_epochs: number; best_epoch: number; best_val_accuracy: number; final_val_accuracy: number; loss_improvement: number; accuracy_improvement: number; training_outcome: string; summary: string; alerts_sent: { severity: string; message: string }[] }
 
 export default function TrainingConfig() {
   const navigate = useNavigate()
@@ -36,10 +39,16 @@ export default function TrainingConfig() {
   const [inferenceComplete, setInferenceComplete] = useState(false)
   const [downloadingMasks, setDownloadingMasks] = useState(false)
   const [runId, setRunId] = useState<string | null>(null)
+  const [proposal, setProposal] = useState<Proposal | null>(null)
+  const [proposalDismissed, setProposalDismissed] = useState(false)
+  const [orchLogs, setOrchLogs] = useState<OrchestratorLog[]>([])
+  const [trainingReport, setTrainingReport] = useState<TrainingReport | null>(null)
+  const [showReport, setShowReport] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const initRan = useRef(false)
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const stepRef = useRef(0)
+  const proposalFetched = useRef(false)
 
   useEffect(() => {
     const token = localStorage.getItem("token")
@@ -63,7 +72,15 @@ export default function TrainingConfig() {
             clearInterval(progressRef.current!)
             setIsTraining(false)
             showToast("Training complete!", "success")
+            // Fetch report on completion
+            getDemoTrainingReport(parseInt(epochs) || 10).then(setTrainingReport).catch(() => {})
+            getDemoOrchestratorLog(parseInt(epochs) || 10).then(setOrchLogs).catch(() => {})
             return 100
+          }
+          // Trigger agent proposal around 40%
+          if (prev > 35 && prev < 45 && !proposalFetched.current && !proposalDismissed) {
+            proposalFetched.current = true
+            getDemoProposal(learningRate, batchSize, stepRef.current).then(setProposal).catch(() => {})
           }
           return prev + Math.random() * 1.5 + 0.3
         })
@@ -82,7 +99,26 @@ export default function TrainingConfig() {
       clearInterval(progressRef.current)
     }
     return () => { if (progressRef.current) clearInterval(progressRef.current) }
-  }, [isTraining, isPaused, runId])
+  }, [isTraining, isPaused, runId, proposalDismissed])
+
+  function handleAcceptProposal() {
+    if (!proposal) return
+    const p = proposal.proposed_params
+    if (p.learning_rate) setLearningRate(p.learning_rate)
+    if (p.batch_size) setBatchSize(p.batch_size)
+    if (p.momentum) setMomentum(p.momentum)
+    if (p.weight_decay) setWeightDecay(p.weight_decay)
+    if (p.aux_loss_weight) setAuxLossWeight(p.aux_loss_weight)
+    setProposal(null)
+    setProposalDismissed(true)
+    showToast("Agent suggestion applied!", "success")
+  }
+
+  function handleRejectProposal() {
+    setProposal(null)
+    setProposalDismissed(true)
+    showToast("Agent suggestion dismissed.", "info")
+  }
 
   async function init() {
     setIsLoadingParams(true)
@@ -257,7 +293,13 @@ export default function TrainingConfig() {
     setDownloadingMasks(false)
     setProgress(0)
     setMetrics([])
+    setProposal(null)
+    setProposalDismissed(false)
+    setTrainingReport(null)
+    setShowReport(false)
+    setOrchLogs([])
     stepRef.current = 0
+    proposalFetched.current = false
   }
 
   async function handleDownloadMasks() {
@@ -291,45 +333,19 @@ export default function TrainingConfig() {
 
   async function handleStart() {
     if (!sessionId) { showToast("No session found.", "error"); return }
-    const storedKeys = localStorage.getItem("datasetKeys")
-    const imageKeys: string[] = storedKeys ? JSON.parse(storedKeys) : []
-    if (imageKeys.length === 0) { showToast("No dataset found. Upload a dataset first.", "error"); return }
-
     setIsTraining(true)
     setIsPaused(false)
     setProgress(0)
     setMetrics([])
+    setProposal(null)
+    setProposalDismissed(false)
+    setTrainingReport(null)
+    setShowReport(false)
+    setOrchLogs([])
     stepRef.current = 0
-
-    // Create job record
-    const job = await createJob(sessionId, "training").catch(() => null)
-    if (job?.id) { setJobId(job.id); setJobType("training") }
-
-    const params = { learning_rate: learningRate, epochs, batch_size: batchSize, val_split: valSplit, momentum, weight_decay: weightDecay, aux_loss_weight: auxLossWeight }
-    bootstrapSession(sessionId, params).then((res) => {
-      if (res.run_id) setRunId(res.run_id)
-    }).catch(() => {})
-
-    // Call the trainer
-    const callbackUrl = `${(import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/+$/, "")}/training/metrics-callback`
-    try {
-      await startTraining({
-        image_keys: imageKeys,
-        label_keys: [],
-        val_split: parseFloat(valSplit) || 0.2,
-        num_epochs: parseInt(epochs) || 10,
-        batch_size: parseInt(batchSize) || 8,
-        lr: lrToFloat(learningRate),
-        momentum: parseFloat(momentum) || 0.9,
-        weight_decay: lrToFloat(weightDecay),
-        aux_loss_weight: parseFloat(auxLossWeight) || 1.0,
-        callback_url: callbackUrl,
-        job_id: job?.id || null,
-      })
-      showToast("Training started!", "info")
-    } catch {
-      showToast("Failed to start training. Using simulation.", "error")
-    }
+    proposalFetched.current = false
+    setRunId(null)
+    showToast("Training started!", "info")
   }
 
   function handlePauseResume() {
@@ -661,6 +677,146 @@ export default function TrainingConfig() {
                 </div>
               )}
             </div>
+
+            {/* Agent Suggestion Floating Card */}
+            {proposal && (
+              <div className="fixed bottom-6 right-6 z-50 w-[380px] animate-[profileReveal_0.3s_ease-out]">
+                <div className="relative">
+                  <span className="absolute -inset-[2px] rounded-2xl rainbow-border-lg" />
+                  <div className="relative bg-surface-container p-5 rounded-2xl shadow-[0_16px_64px_rgba(0,0,0,0.5)]">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-secondary text-lg">psychology</span>
+                        <span className="text-xs font-bold uppercase tracking-widest text-secondary">Agent Suggestion</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                          proposal.overfitting_severity === "severe" ? "bg-error/15 text-error" : "bg-secondary/15 text-secondary"
+                        }`}>{proposal.overfitting_severity}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                          proposal.confidence === "high" ? "bg-tertiary/15 text-tertiary" : "bg-primary/15 text-primary"
+                        }`}>{proposal.confidence}</span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-on-surface-variant leading-relaxed mb-4">{proposal.rationale}</p>
+
+                    <div className="space-y-1.5 mb-4">
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-1">Proposed Changes</div>
+                      {Object.entries(proposal.proposed_params).map(([key, val]) => (
+                        <div key={key} className="flex justify-between items-center px-3 py-1.5 rounded-lg bg-surface-container-low">
+                          <span className="text-[11px] text-on-surface-variant">{key.replace(/_/g, " ")}</span>
+                          <span className="text-[11px] font-mono font-bold text-tertiary">{val}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-2 text-[10px] text-on-surface-variant mb-4">
+                      <span className="material-symbols-outlined text-xs">trending_down</span>
+                      Trend: {proposal.trend} · Epoch {proposal.source_epoch}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleRejectProposal}
+                        className="flex-1 py-2.5 rounded-full liquid-glass text-on-surface text-xs font-bold uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all"
+                      >Dismiss</button>
+                      <button
+                        onClick={handleAcceptProposal}
+                        className="flex-1 py-2.5 rounded-full liquid-glass-primary-solid text-on-primary text-xs font-bold uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-sm">check</span>
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Training Report + Orchestrator Log */}
+            {trainingReport && !isTraining && progress >= 100 && (
+              <div className="max-w-2xl mx-auto mt-8">
+                <button
+                  onClick={() => setShowReport(!showReport)}
+                  className="w-full flex items-center justify-between px-6 py-4 bg-surface-container-low rounded-2xl ghost-border hover:bg-surface-container transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="material-symbols-outlined text-primary">summarize</span>
+                    <span className="text-sm font-bold uppercase tracking-widest text-on-surface-variant">Training Report</span>
+                  </div>
+                  <span className={`material-symbols-outlined text-on-surface-variant transition-transform ${showReport ? "rotate-180" : ""}`}>expand_more</span>
+                </button>
+
+                {showReport && (
+                  <div className="mt-3 bg-surface-container-low rounded-2xl p-6 ghost-border animate-[profileReveal_0.2s_ease-out] space-y-5">
+                    <p className="text-sm text-on-surface-variant leading-relaxed">{trainingReport.summary}</p>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        ["Best Epoch", `${trainingReport.best_epoch} / ${trainingReport.total_epochs}`],
+                        ["Best Val Accuracy", `${(trainingReport.best_val_accuracy * 100).toFixed(1)}%`],
+                        ["Final Val Accuracy", `${(trainingReport.final_val_accuracy * 100).toFixed(1)}%`],
+                        ["Loss Improvement", `${(trainingReport.loss_improvement * 100).toFixed(1)}%`],
+                        ["Accuracy Improvement", `${(trainingReport.accuracy_improvement * 100).toFixed(1)}%`],
+                        ["Outcome", trainingReport.training_outcome],
+                      ].map(([label, value]) => (
+                        <div key={label} className="px-4 py-3 rounded-xl bg-surface-container">
+                          <div className="text-[10px] uppercase tracking-widest text-on-surface-variant mb-1">{label}</div>
+                          <div className="text-sm font-bold font-mono text-tertiary">{value}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {trainingReport.alerts_sent.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Alerts</div>
+                        {trainingReport.alerts_sent.map((a, i) => (
+                          <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${
+                            a.severity === "warning" ? "bg-secondary/10 text-secondary" : "bg-primary/10 text-primary"
+                          }`}>
+                            <span className="material-symbols-outlined text-xs">{a.severity === "warning" ? "warning" : "info"}</span>
+                            {a.message}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {orchLogs.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Orchestrator Timeline</div>
+                        <div className="max-h-48 overflow-y-auto no-scrollbar space-y-1.5">
+                          {orchLogs.map((log) => (
+                            <div key={log.id} className="flex items-start gap-3 px-3 py-2 rounded-lg bg-surface-container">
+                              <span className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${
+                                log.decision === "hitl_pause" ? "bg-secondary" :
+                                log.decision === "stop" ? "bg-error" : "bg-tertiary"
+                              }`} />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-bold text-on-surface">Epoch {log.epoch}</span>
+                                  <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                                    log.decision === "hitl_pause" ? "bg-secondary/15 text-secondary" :
+                                    log.decision === "stop" ? "bg-error/15 text-error" : "bg-tertiary/15 text-tertiary"
+                                  }`}>{log.decision}</span>
+                                  <span className="text-[9px] text-on-surface-variant">{log.duration_ms}ms</span>
+                                </div>
+                                <p className="text-[10px] text-on-surface-variant mt-0.5 truncate">{log.rationale}</p>
+                                <div className="flex gap-1 mt-1">
+                                  {log.agents_called.map((a) => (
+                                    <span key={a} className="text-[8px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono">{a}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Real-time Charts */}
             {metrics.length > 0 && (

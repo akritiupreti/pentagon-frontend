@@ -321,3 +321,20 @@ export async function reviewProposal(sessionId: string, proposalId: string, body
     })
     return res.json()
 }
+
+// ── Demo (no-auth) ──
+
+export async function getDemoProposal(currentLr: string, currentBatchSize: string, sourceEpoch: number) {
+    const res = await fetch(`${BASE_URL}/demo/proposal?current_lr=${currentLr}&current_batch_size=${currentBatchSize}&source_epoch=${sourceEpoch}`)
+    return res.json()
+}
+
+export async function getDemoOrchestratorLog(totalEpochs: number) {
+    const res = await fetch(`${BASE_URL}/demo/orchestrator-log?total_epochs=${totalEpochs}`)
+    return res.json()
+}
+
+export async function getDemoTrainingReport(totalEpochs: number) {
+    const res = await fetch(`${BASE_URL}/demo/training-report?total_epochs=${totalEpochs}`)
+    return res.json()
+}
